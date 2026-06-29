@@ -28,7 +28,6 @@ ALL_MODELS = [
     "nvidia/nemotron-3-ultra-550b-a55b",
     "nvidia/nemotron-3-super-120b-a12b",
     "openai/gpt-oss-120b",
-    "qwen/qwen3.5-122b-a10b",
 ]
 
 GROUP1_MODELS = ALL_MODELS[:2]
