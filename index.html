@@ -101,6 +101,7 @@ section[data-tab].active{display:block}
 .chart-row-3{grid-template-columns:minmax(0,2fr) minmax(0,2fr) minmax(280px,1.25fr)}
 .chart-wrap{position:relative;height:230px}
 .chart-wrap-lg{position:relative;height:270px}
+.timeslot-chart-wrap{height:320px}
 
 /* Reliability */
 .reliability-grid{display:flex;flex-wrap:wrap;gap:7px;align-content:flex-start}
@@ -270,6 +271,7 @@ td{padding:10px 14px;color:var(--text);vertical-align:middle}
   .section-title{font-size:24px}
   .chart-row-2,.chart-row-3{grid-template-columns:1fr}
   .chart-row-3 .card:last-child{grid-column:auto}
+  .timeslot-chart-wrap{height:280px}
 }
 @media(max-width:700px){
   .kpi-grid,.stats-row{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -284,6 +286,7 @@ td{padding:10px 14px;color:var(--text);vertical-align:middle}
 @media(max-width:460px){
   .kpi-grid,.stats-row{grid-template-columns:1fr}
   .section-header{align-items:flex-start;flex-direction:column;gap:8px}
+  .timeslot-chart-wrap{height:250px}
 }
 
 /* Utility */
@@ -329,15 +332,11 @@ td{padding:10px 14px;color:var(--text);vertical-align:middle}
         </div>
       </div>
       <div class="kpi-grid" id="kpi-grid"></div>
-      <div class="chart-row chart-row-2" style="margin-bottom:20px">
+      <div class="chart-row" style="margin-bottom:20px">
         <div class="card">
           <div class="card-title"><span class="dot"></span>Best Timeslot to Work</div>
-          <div class="chart-wrap"><canvas id="chart-best-timeslot"></canvas></div>
+          <div class="chart-wrap timeslot-chart-wrap"><canvas id="chart-best-timeslot"></canvas></div>
           <div id="timeslot-recommendations" class="timeslot-recs"></div>
-        </div>
-        <div class="card">
-          <div class="card-title"><span class="dot"></span>Success Rate Over Time</div>
-          <div class="chart-wrap"><canvas id="chart-success-rate"></canvas></div>
         </div>
       </div>
       <div class="chart-row chart-row-3">
@@ -1044,8 +1043,6 @@ function renderBestTimeslot() {
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
   const dataSec = smoothed.map(v => v / 1000);
   const cnPeakWindows = getCnPeakLocalWindows();
-  const cnPeakLocalLabel = cnPeakWindows.map(w => w.localLabel).join(', ');
-  const cnPeakUtcLabel = cnPeakWindows.map(w => w.utcLabel).join(', ');
 
   // Color gradient: fastest = green, slowest = orange/red
   const minVal = Math.min(...smoothed);
@@ -1120,13 +1117,13 @@ function renderBestTimeslot() {
 
   // Recommendations
   const recsEl = document.getElementById('timeslot-recommendations');
-  const cnPeakPill = `<div class="timeslot-pill cn-peak" title="${cnPeakUtcLabel}">
+  const cnPeakPills = cnPeakWindows.map(w => `<div class="timeslot-pill cn-peak" title="${w.utcLabel}">
       <span class="rank">CN</span>
-      <span class="ts-range">${cnPeakLocalLabel}</span>
+      <span class="ts-range">${w.localLabel}</span>
       <span class="ts-conf">LOCAL</span>
-    </div>`;
+    </div>`).join('');
   if (!bestSlots.length) {
-    recsEl.innerHTML = '<span class="no-data">Not enough data yet</span>' + cnPeakPill;
+    recsEl.innerHTML = '<span class="no-data">Not enough data yet</span>' + cnPeakPills;
     return;
   }
   const rankLabels = ['01', '02', '03'];
@@ -1142,7 +1139,7 @@ function renderBestTimeslot() {
       <span class="ts-score">${zone.score}</span>
       <span class="ts-conf">${confidence}</span>
     </div>`;
-  }).join('') + cnPeakPill;
+  }).join('') + cnPeakPills;
 }
 
 // --- Overview Tab -------------------------------------------------------------
@@ -1189,44 +1186,7 @@ function renderOverview() {
   document.getElementById('overview-sub').textContent =
     `${totalRuns} benchmark runs | ${modelNames.length} models | ${runs[0]?.timestamp?.slice(0,10)} to ${runs[runs.length-1]?.timestamp?.slice(0,10)}`;
 
-  // Charts
-  const labels = runs.map(r => fmtTimestampShort(r.timestamp));
-  const successRates = runs.map(r => {
-    const total = r.summary?.totalModels || r.models.length;
-    const succ = r.summary?.successCount ?? r.models.filter(m => m.success).length;
-    return (succ / total) * 100;
-  });
-
   renderBestTimeslot();
-
-  destroyChart('successRate');
-  state.charts.successRate = new Chart(document.getElementById('chart-success-rate'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Success %',
-        data: successRates,
-        borderColor: '#5ca7f2',
-        backgroundColor: 'rgba(21,95,163,0.09)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 2,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-        label: (item) => `${item.raw.toFixed(1)}% success`
-      }}},
-      scales: {
-        x: { display: false },
-        y: { min: 0, max: 100, grid: { color: '#2b3627' }, ticks: { callback: v => v + '%' } }
-      }
-    }
-  });
 
   // Top 10 Fastest
   const modelsWithTime = modelNames
