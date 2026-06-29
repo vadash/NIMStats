@@ -6,10 +6,11 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HISTORY_DB = REPO_ROOT / "history.db"
-MAX_RUNS = 720
+MAX_RUNS = 30 * 2 * 24
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript("""
         PRAGMA journal_mode=WAL;
         CREATE TABLE IF NOT EXISTS runs (
@@ -79,6 +80,11 @@ def write_run(run: dict[str, Any], db_path: Path = HISTORY_DB) -> None:
             f"DELETE FROM runs WHERE id NOT IN "
             f"(SELECT id FROM runs ORDER BY timestamp DESC LIMIT {MAX_RUNS})"
         )
+        conn.execute(
+            "DELETE FROM model_results "
+            "WHERE run_id NOT IN (SELECT id FROM runs)"
+        )
         conn.commit()
+        conn.execute("VACUUM")
     finally:
         conn.close()
