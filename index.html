@@ -599,6 +599,7 @@ function categorizeError(err) {
 function computeHourlyStats() {
   const hourData = Array.from({ length: 24 }, () => []);
   const hourRealCount = Array(24).fill(0);
+  const hourFailCount = Array(24).fill(0);
 
   for (const run of state.runs) {
     const localHour = new Date(run.timestamp).getHours();
@@ -606,6 +607,8 @@ function computeHourlyStats() {
       if (m.success && m.responseTime > 0) {
         hourData[localHour].push(m.responseTime);
         hourRealCount[localHour]++;
+      } else if (!m.success) {
+        hourFailCount[localHour]++;
       }
     }
   }
@@ -620,10 +623,26 @@ function computeHourlyStats() {
   }
   const globalMean = hoursWithData.length ? avg(hoursWithData) : 0;
 
+  for (let h = 0; h < 24; h++) {
+    if (hourData[h].length === 0 && hourFailCount[h] === 0) {
+      hourAvg[h] = globalMean;
+    }
+  }
+
+  // Penalize hours with failures by pushing failed models as 2x global mean
+  for (let h = 0; h < 24; h++) {
+    if (hourFailCount[h] > 0) {
+      const penalty = 2 * (globalMean || 1);
+      for (let i = 0; i < hourFailCount[h]; i++) {
+        hourData[h].push(penalty);
+      }
+      hourAvg[h] = avg(hourData[h]);
+    }
+  }
+
   const isReal = Array(24).fill(true);
   for (let h = 0; h < 24; h++) {
     if (hourData[h].length === 0) {
-      hourAvg[h] = globalMean;
       isReal[h] = false;
     }
   }
@@ -639,7 +658,7 @@ function computeHourlyStats() {
 
   const sampleCounts = hourData.map(d => d.length);
 
-  return { hourAvg, smoothed, isReal, hourRealCount, sampleCounts };
+  return { hourAvg, smoothed, isReal, hourRealCount, sampleCounts, hourFailCount };
 }
 
 function computeBestTimeslots(hourlyStats) {
@@ -896,7 +915,7 @@ function processData(data) {
 function renderBestTimeslot() {
   const hourlyStats = computeHourlyStats();
   const bestSlots = computeBestTimeslots(hourlyStats);
-  const { smoothed, sampleCounts } = hourlyStats;
+  const { smoothed, sampleCounts, hourFailCount } = hourlyStats;
 
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
   const dataSec = smoothed.map(v => v / 1000);
@@ -951,7 +970,12 @@ function renderBestTimeslot() {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
         title: (items) => `Hour ${items[0].label}:00`,
-        label: (item) => `Avg: ${item.raw.toFixed(2)}s (${sampleCounts[item.dataIndex]} samples)`
+        label: (item) => {
+          const h = item.dataIndex;
+          const fails = hourFailCount[h];
+          const failStr = fails > 0 ? ` | ${fails} failed` : '';
+          return `Avg: ${item.raw.toFixed(2)}s (${sampleCounts[h]} samples${failStr})`;
+        }
       }}},
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
