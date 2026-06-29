@@ -6,6 +6,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -40,6 +41,11 @@ def selected_models() -> list[str]:
     if MODEL_GROUP == "group2":
         return GROUP2_MODELS
     return ALL_MODELS
+
+
+def build_runtime_prompt() -> str:
+    cache_buster = uuid.uuid4()
+    return f"{PROMPT}\n\nRequest ID for cache isolation, ignore in your answer: {cache_buster}"
 
 
 def failure_result(model: str, error: str) -> dict[str, Any]:
@@ -219,6 +225,7 @@ def main() -> int:
 
     models = selected_models()
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    runtime_prompt = build_runtime_prompt()
 
     group_label = f" (Group: {MODEL_GROUP})" if MODEL_GROUP else ""
     print(f"Starting NVIDIA NIM Model Benchmarks{group_label}...")
@@ -229,7 +236,7 @@ def main() -> int:
     results: list[dict[str, Any]] = []
     for model in models:
         print(f"Testing: {model}")
-        result = call_model(model, PROMPT)
+        result = call_model(model, runtime_prompt)
         if result.get("success"):
             print(
                 f"  ✓ Success ({result['responseTime']}ms, {result.get('tokensGenerated', 0)} tokens)"
@@ -242,7 +249,7 @@ def main() -> int:
     print()
     print("Compiling results...")
 
-    final_json = compile_output(timestamp, PROMPT, results)
+    final_json = compile_output(timestamp, runtime_prompt, results)
     OUTPUT_FILE.write_text(json.dumps(final_json, indent=2), encoding="utf-8")
 
     success_count = final_json["summary"]["successCount"]
