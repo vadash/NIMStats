@@ -26,16 +26,14 @@ ALL_MODELS = [
     "z-ai/glm-5.1",
     "moonshotai/kimi-k2.6",
     "nvidia/nemotron-3-ultra-550b-a55b",
-    "openai/gpt-oss-120b",
-    "minimaxai/minimax-m3",
-    "deepseek-ai/deepseek-v4-pro",
-    "qwen/qwen3.5-122b-a10b",
     "nvidia/nemotron-3-super-120b-a12b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.5-122b-a10b",
 ]
 
-GROUP1_MODELS = ALL_MODELS[:3]
+GROUP1_MODELS = ALL_MODELS[:2]
 
-GROUP2_MODELS = ALL_MODELS[3:]
+GROUP2_MODELS = ALL_MODELS[2:]
 
 def selected_models() -> list[str]:
     if MODEL_GROUP == "group1":
