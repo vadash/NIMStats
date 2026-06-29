@@ -159,6 +159,16 @@ td{padding:10px 16px;color:var(--text);vertical-align:middle}
 .stat-card .stat-label{font-size:11px;color:var(--text-dim);margin-top:4px;text-transform:uppercase;letter-spacing:0.5px}
 .stat-card .stat-sub{font-size:11px;color:var(--text-muted);margin-top:3px}
 
+.rel-pill.gray{background:rgba(100,100,120,0.1);border-color:rgba(100,100,120,0.25);color:#64748b}
+.timeslot-recs{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.timeslot-pill{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid transparent;transition:all 0.2s;cursor:default;font-family:'JetBrains Mono',monospace}
+.timeslot-pill.green{background:rgba(34,197,94,0.1);border-color:rgba(34,197,94,0.25);color:#22c55e}
+.timeslot-pill.yellow{background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.25);color:#f59e0b}
+.timeslot-pill.gray{background:rgba(100,100,120,0.1);border-color:rgba(100,100,120,0.25);color:#64748b}
+.timeslot-pill .rank{font-size:14px}
+.timeslot-pill .ts-range{color:var(--text)}
+.timeslot-pill .ts-score{font-weight:700}
+.timeslot-pill .ts-conf{opacity:0.7;font-size:10px}
 /* Heatmap */
 .heatmap{display:grid;gap:4px;margin-top:12px}
 .heatmap-cell{aspect-ratio:1;border-radius:3px;position:relative;cursor:default;transition:transform 0.15s}
@@ -311,8 +321,9 @@ td{padding:10px 16px;color:var(--text);vertical-align:middle}
       <div class="kpi-grid" id="kpi-grid"></div>
       <div class="chart-row chart-row-2" style="margin-bottom:20px">
         <div class="card">
-          <div class="card-title"><span class="dot"></span>Success Count per Run</div>
-          <div class="chart-wrap"><canvas id="chart-success-count"></canvas></div>
+          <div class="card-title"><span class="dot"></span>Best Timeslot to Work</div>
+          <div class="chart-wrap"><canvas id="chart-best-timeslot"></canvas></div>
+          <div id="timeslot-recommendations" class="timeslot-recs"></div>
         </div>
         <div class="card">
           <div class="card-title"><span class="dot"></span>Success Rate Over Time</div>
@@ -585,6 +596,108 @@ function categorizeError(err) {
   return 'Other Error';
 }
 
+function computeHourlyStats() {
+  const hourData = Array.from({ length: 24 }, () => []);
+  const hourRealCount = Array(24).fill(0);
+
+  for (const run of state.runs) {
+    const localHour = new Date(run.timestamp).getHours();
+    for (const m of run.models) {
+      if (m.success && m.responseTime > 0) {
+        hourData[localHour].push(m.responseTime);
+        hourRealCount[localHour]++;
+      }
+    }
+  }
+
+  const hourAvg = Array(24).fill(0);
+  const hoursWithData = [];
+  for (let h = 0; h < 24; h++) {
+    if (hourData[h].length > 0) {
+      hourAvg[h] = avg(hourData[h]);
+      hoursWithData.push(hourAvg[h]);
+    }
+  }
+  const globalMean = hoursWithData.length ? avg(hoursWithData) : 0;
+
+  const isReal = Array(24).fill(true);
+  for (let h = 0; h < 24; h++) {
+    if (hourData[h].length === 0) {
+      hourAvg[h] = globalMean;
+      isReal[h] = false;
+    }
+  }
+
+  // 3-hour moving average smoothing
+  const smoothed = Array(24).fill(0);
+  for (let h = 0; h < 24; h++) {
+    const prev = hourAvg[(h - 1 + 24) % 24];
+    const curr = hourAvg[h];
+    const next = hourAvg[(h + 1) % 24];
+    smoothed[h] = (prev + curr + next) / 3;
+  }
+
+  const sampleCounts = hourData.map(d => d.length);
+
+  return { hourAvg, smoothed, isReal, hourRealCount, sampleCounts };
+}
+
+function computeBestTimeslots(hourlyStats) {
+  const { smoothed, isReal } = hourlyStats;
+  const ZONE_SIZE = 4;
+
+  // Generate all 24 possible 4-hour zones
+  const zones = [];
+  for (let start = 0; start < 24; start++) {
+    const hours = [];
+    let realCount = 0;
+    for (let offset = 0; offset < ZONE_SIZE; offset++) {
+      const h = (start + offset) % 24;
+      hours.push(h);
+      if (isReal[h]) realCount++;
+    }
+    const zoneAvg = avg(hours.map(h => smoothed[h]));
+    zones.push({ start, hours, avgTime: zoneAvg, realCount, score: 0 });
+  }
+
+  // Assign scores (relative: fastest = 100)
+  const minAvg = Math.min(...zones.map(z => z.avgTime));
+  const maxAvg = Math.max(...zones.map(z => z.avgTime));
+  for (const z of zones) {
+    z.score = maxAvg > minAvg ? Math.round((minAvg / z.avgTime) * 100) : 100;
+  }
+
+  // Find best combination of 3 non-overlapping zones (max sum of scores)
+  // Two zones overlap if they share any hour
+  let bestCombo = null;
+  let bestSum = -1;
+
+  for (let i = 0; i < zones.length; i++) {
+    for (let j = i + 1; j < zones.length; j++) {
+      if (zonesOverlap(zones[i], zones[j])) continue;
+      for (let k = j + 1; k < zones.length; k++) {
+        if (zonesOverlap(zones[i], zones[k]) || zonesOverlap(zones[j], zones[k])) continue;
+        const sum = zones[i].score + zones[j].score + zones[k].score;
+        if (sum > bestSum) {
+          bestSum = sum;
+          bestCombo = [zones[i], zones[j], zones[k]];
+        }
+      }
+    }
+  }
+
+  if (!bestCombo) return [];
+
+  // Sort by score descending
+  bestCombo.sort((a, b) => b.score - a.score);
+  return bestCombo;
+}
+
+function zonesOverlap(a, b) {
+  const setA = new Set(a.hours);
+  return b.hours.some(h => setA.has(h));
+}
+
 function modelColor(model) {
   const idx = state.modelNames.indexOf(model);
   return MODEL_PALETTE[idx % MODEL_PALETTE.length];
@@ -779,6 +892,96 @@ function processData(data) {
   return { runs, modelNames, modelStats };
 }
 
+// ─── Best Timeslot Chart ────────────────────────────────────────────────────
+function renderBestTimeslot() {
+  const hourlyStats = computeHourlyStats();
+  const bestSlots = computeBestTimeslots(hourlyStats);
+  const { smoothed, sampleCounts } = hourlyStats;
+
+  const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
+  const dataSec = smoothed.map(v => v / 1000);
+
+  // Color gradient: fastest = green, slowest = orange/red
+  const minVal = Math.min(...smoothed);
+  const maxVal = Math.max(...smoothed);
+  const range = maxVal - minVal || 1;
+
+  const barColorsFills = smoothed.map(v => {
+    const t = (v - minVal) / range;
+    const r = Math.round(118 + t * (239 - 118));
+    const g = Math.round(185 - t * (185 - 68));
+    const b = Math.round(0 + t * (68 - 0));
+    return { r, g, b };
+  });
+
+  // Highlight best zones
+  const highlightBorders = barColorsFills.map(() => null);
+  const highlightBg = barColorsFills.map(() => null);
+  for (let si = 0; si < bestSlots.length; si++) {
+    const zone = bestSlots[si];
+    for (const h of zone.hours) {
+      const borderColor = si === 0 ? '#76b900' : si === 1 ? '#22c55e' : '#06b6d4';
+      highlightBorders[h] = borderColor;
+      highlightBg[h] = borderColor + 'cc';
+    }
+  }
+
+  const finalBgColors = barColorsFills.map((c, h) =>
+    highlightBg[h] ? highlightBg[h] : `rgba(${c.r},${c.g},${c.b},0.7)`
+  );
+  const finalBorderColors = barColorsFills.map((c, h) =>
+    highlightBorders[h] ? highlightBorders[h] : `rgb(${c.r},${c.g},${c.b})`
+  );
+
+  destroyChart('bestTimeslot');
+  state.charts.bestTimeslot = new Chart(document.getElementById('chart-best-timeslot'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Avg Response Time',
+        data: dataSec,
+        backgroundColor: finalBgColors,
+        borderColor: finalBorderColors,
+        borderWidth: 2,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+        title: (items) => `Hour ${items[0].label}:00`,
+        label: (item) => `Avg: ${item.raw.toFixed(2)}s (${sampleCounts[item.dataIndex]} samples)`
+      }}},
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: '#1c1c2e' }, ticks: { callback: v => v + 's' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // Recommendations
+  const recsEl = document.getElementById('timeslot-recommendations');
+  if (!bestSlots.length) {
+    recsEl.innerHTML = '<span class="no-data">Not enough data yet</span>';
+    return;
+  }
+  const rankEmojis = ['🥇', '🥈', '🥉'];
+  recsEl.innerHTML = bestSlots.map((zone, i) => {
+    const startH = String(zone.start).padStart(2, '0');
+    const endH = String((zone.start + 4) % 24).padStart(2, '0');
+    const confLabel = zone.realCount >= 3 ? 'high' : zone.realCount === 2 ? 'medium' : 'low';
+    const confCls = zone.realCount >= 3 ? 'green' : zone.realCount === 2 ? 'yellow' : 'gray';
+    const confDot = zone.realCount >= 3 ? '🟢' : zone.realCount === 2 ? '🟡' : '⚪';
+    return `<div class="timeslot-pill ${confCls}">
+      <span class="rank">${rankEmojis[i]}</span>
+      <span class="ts-range">${startH}:00-${endH}:00</span>
+      <span class="ts-score">${zone.score}</span>
+      <span class="ts-conf">${confDot} ${confLabel}</span>
+    </div>`;
+  }).join('');
+}
+
 // ─── Overview Tab ─────────────────────────────────────────────────────────────
 function renderOverview() {
   const { runs, modelNames, modelStats } = state;
@@ -825,41 +1028,13 @@ function renderOverview() {
 
   // Charts
   const labels = runs.map(r => fmtTimestampShort(r.timestamp));
-  const successCounts = runs.map(r => r.summary?.successCount ?? r.models.filter(m => m.success).length);
   const successRates = runs.map(r => {
     const total = r.summary?.totalModels || r.models.length;
     const succ = r.summary?.successCount ?? r.models.filter(m => m.success).length;
     return (succ / total) * 100;
   });
 
-  destroyChart('successCount');
-  state.charts.successCount = new Chart(document.getElementById('chart-success-count'), {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Successes',
-        data: successCounts,
-        borderColor: '#76b900',
-        backgroundColor: 'rgba(118,185,0,0.08)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        borderWidth: 2,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-        title: (items) => `Run ${items[0].dataIndex + 1}: ${labels[items[0].dataIndex]}`
-      }}},
-      scales: {
-        x: { display: false },
-        y: { min: 0, max: 20, grid: { color: '#1c1c2e' }, ticks: { stepSize: 5 } }
-      }
-    }
-  });
+  renderBestTimeslot();
 
   destroyChart('successRate');
   state.charts.successRate = new Chart(document.getElementById('chart-success-rate'), {
