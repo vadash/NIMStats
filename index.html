@@ -163,10 +163,12 @@ td{padding:10px 14px;color:var(--text);vertical-align:middle}
 .timeslot-pill.green{background:var(--success-dim);border-color:rgba(32,124,58,0.22);color:var(--success)}
 .timeslot-pill.yellow{background:var(--warning-dim);border-color:rgba(168,100,0,0.22);color:var(--warning)}
 .timeslot-pill.gray{background:var(--surface-strong);border-color:rgba(95,103,91,0.18);color:var(--text-dim)}
+.timeslot-pill.cn-peak{background:rgba(242,184,75,0.09);border-color:rgba(242,184,75,0.35);color:var(--warning)}
 .timeslot-pill .rank{font-size:11px;font-weight:800;color:var(--text-dim)}
 .timeslot-pill .ts-range{color:var(--text)}
 .timeslot-pill .ts-score{font-weight:800}
 .timeslot-pill .ts-conf{opacity:0.75;font-size:10px;text-transform:uppercase;letter-spacing:0.04em}
+.timeslot-pill.cn-peak .ts-range{color:var(--warning)}
 .heatmap{display:grid;gap:4px;margin-top:12px}
 .heatmap-cell{aspect-ratio:1;border-radius:2px;position:relative;cursor:default;transition:transform 0.12s}
 .heatmap-cell:hover{transform:scale(1.22);z-index:10;outline:1px solid var(--text)}
@@ -522,9 +524,123 @@ const CHART_DEFAULTS = {
   }
 };
 
+const CN_PEAK_UTC_WINDOWS = [
+  { start: 1, end: 4 },
+  { start: 6, end: 10 }
+];
+
 Chart.defaults.color = '#aeb9a8';
 Chart.defaults.borderColor = '#2b3627';
 Chart.defaults.font.family = "'Inter', sans-serif";
+
+function wrapHour(hour) {
+  return ((hour % 24) + 24) % 24;
+}
+
+function getPeakReferenceDate() {
+  const latestRun = state.runs[state.runs.length - 1];
+  const latestDate = latestRun?.timestamp ? new Date(latestRun.timestamp) : null;
+  return latestDate && !Number.isNaN(latestDate.getTime()) ? latestDate : new Date();
+}
+
+function utcBoundaryToLocalHour(utcHour, referenceDate) {
+  const utcMidnight = Date.UTC(
+    referenceDate.getUTCFullYear(),
+    referenceDate.getUTCMonth(),
+    referenceDate.getUTCDate()
+  );
+  const localDate = new Date(utcMidnight + utcHour * 60 * 60 * 1000);
+  return localDate.getHours() + (localDate.getMinutes() / 60);
+}
+
+function formatHourBoundary(hour) {
+  const totalMinutes = Math.round(wrapHour(hour) * 60) % (24 * 60);
+  const hh = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+  const mm = String(totalMinutes % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+function splitHourWindow(start, end) {
+  const s = wrapHour(start);
+  const e = wrapHour(end);
+  if (Math.abs(s - e) < 0.001) return [{ start: 0, end: 24 }];
+  return e > s ? [{ start: s, end: e }] : [{ start: s, end: 24 }, { start: 0, end: e }];
+}
+
+function getCnPeakLocalWindows() {
+  const referenceDate = getPeakReferenceDate();
+  return CN_PEAK_UTC_WINDOWS.map(w => {
+    const localStart = utcBoundaryToLocalHour(w.start, referenceDate);
+    const localEnd = utcBoundaryToLocalHour(w.end, referenceDate);
+    const localLabel = `${formatHourBoundary(localStart)}-${formatHourBoundary(localEnd)}`;
+    const utcLabel = `${formatHourBoundary(w.start)}-${formatHourBoundary(w.end)} UTC`;
+    return { ...w, localStart, localEnd, localLabel, utcLabel };
+  });
+}
+
+function cnPeakWindowsForHour(hour, windows) {
+  return windows.filter(w => splitHourWindow(w.localStart, w.localEnd).some(seg =>
+    seg.start < hour + 1 && seg.end > hour
+  ));
+}
+
+const cnPeakOverlayPlugin = {
+  id: 'cnPeakOverlay',
+  beforeDatasetsDraw(chart, args, options) {
+    const windows = options?.windows || [];
+    const { ctx, chartArea } = chart;
+    if (!windows.length || !chartArea) return;
+
+    const width = chartArea.right - chartArea.left;
+    ctx.save();
+    for (const w of windows) {
+      for (const seg of splitHourWindow(w.localStart, w.localEnd)) {
+        const left = chartArea.left + (seg.start / 24) * width;
+        const right = chartArea.left + (seg.end / 24) * width;
+        ctx.fillStyle = 'rgba(242,184,75,0.09)';
+        ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+        ctx.strokeStyle = 'rgba(242,184,75,0.48)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(left, chartArea.top);
+        ctx.lineTo(left, chartArea.bottom);
+        ctx.moveTo(right, chartArea.top);
+        ctx.lineTo(right, chartArea.bottom);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  },
+  afterDatasetsDraw(chart, args, options) {
+    const windows = options?.windows || [];
+    const { ctx, chartArea } = chart;
+    if (!windows.length || !chartArea) return;
+
+    const width = chartArea.right - chartArea.left;
+    ctx.save();
+    ctx.font = '700 10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (const w of windows) {
+      for (const seg of splitHourWindow(w.localStart, w.localEnd)) {
+        const left = chartArea.left + (seg.start / 24) * width;
+        const right = chartArea.left + (seg.end / 24) * width;
+        const segWidth = right - left;
+        ctx.strokeStyle = 'rgba(242,184,75,0.75)';
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(left, chartArea.top + 1);
+        ctx.lineTo(right, chartArea.top + 1);
+        ctx.stroke();
+        if (segWidth >= 32) {
+          ctx.fillStyle = 'rgba(242,184,75,0.92)';
+          ctx.fillText(segWidth >= 54 ? 'CN PEAK' : 'CN', left + segWidth / 2, chartArea.top + 5);
+        }
+      }
+    }
+    ctx.restore();
+  }
+};
 
 // --- State --------------------------------------------------------------------
 const state = {
@@ -927,6 +1043,9 @@ function renderBestTimeslot() {
 
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
   const dataSec = smoothed.map(v => v / 1000);
+  const cnPeakWindows = getCnPeakLocalWindows();
+  const cnPeakLocalLabel = cnPeakWindows.map(w => w.localLabel).join(', ');
+  const cnPeakUtcLabel = cnPeakWindows.map(w => w.utcLabel).join(', ');
 
   // Color gradient: fastest = green, slowest = orange/red
   const minVal = Math.min(...smoothed);
@@ -974,15 +1093,22 @@ function renderBestTimeslot() {
         borderRadius: 3,
       }]
     },
+    plugins: [cnPeakOverlayPlugin],
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+      layout: { padding: { top: 16 } },
+      plugins: { legend: { display: false }, cnPeakOverlay: { windows: cnPeakWindows }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
         title: (items) => `Hour ${items[0].label}:00`,
         label: (item) => {
           const h = item.dataIndex;
           const fails = hourFailCount[h];
           const failStr = fails > 0 ? ` | ${fails} failed` : '';
-          return `Avg: ${item.raw.toFixed(2)}s (${sampleCounts[h]} samples${failStr})`;
+          const lines = [`Avg: ${item.raw.toFixed(2)}s (${sampleCounts[h]} samples${failStr})`];
+          const peakHits = cnPeakWindowsForHour(h, cnPeakWindows);
+          if (peakHits.length) {
+            lines.push(`CN peak: ${peakHits.map(w => w.localLabel).join(', ')} local`);
+          }
+          return lines;
         }
       }}},
       scales: {
@@ -994,8 +1120,13 @@ function renderBestTimeslot() {
 
   // Recommendations
   const recsEl = document.getElementById('timeslot-recommendations');
+  const cnPeakPill = `<div class="timeslot-pill cn-peak" title="${cnPeakUtcLabel}">
+      <span class="rank">CN</span>
+      <span class="ts-range">${cnPeakLocalLabel}</span>
+      <span class="ts-conf">LOCAL</span>
+    </div>`;
   if (!bestSlots.length) {
-    recsEl.innerHTML = '<span class="no-data">Not enough data yet</span>';
+    recsEl.innerHTML = '<span class="no-data">Not enough data yet</span>' + cnPeakPill;
     return;
   }
   const rankLabels = ['01', '02', '03'];
@@ -1011,7 +1142,7 @@ function renderBestTimeslot() {
       <span class="ts-score">${zone.score}</span>
       <span class="ts-conf">${confidence}</span>
     </div>`;
-  }).join('');
+  }).join('') + cnPeakPill;
 }
 
 // --- Overview Tab -------------------------------------------------------------
