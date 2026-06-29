@@ -17,7 +17,7 @@ API_BASE = os.getenv("API_BASE", "https://integrate.api.nvidia.com/v1")
 API_KEY = os.getenv("NIM_API_KEY", "")
 MODEL_GROUP = os.getenv("MODEL_GROUP", "all")
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "300"))
-PROMPT = "Write a C# function that checks if a number is prime and returns True or False"
+PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and returns a bool. Use a traditional for loop checking divisibility up to the square root of the number. Do not use advanced pattern matching, LINQ, top-level statements, or external libraries. Provide only the valid C# code inside a markdown code block, with absolutely no introductory, explanatory, or concluding text."
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = SCRIPT_DIR / "results.json"
