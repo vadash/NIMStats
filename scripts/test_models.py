@@ -17,7 +17,7 @@ API_BASE = os.getenv("API_BASE", "https://integrate.api.nvidia.com/v1")
 API_KEY = os.getenv("NIM_API_KEY", "")
 MODEL_GROUP = os.getenv("MODEL_GROUP", "all")
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "300"))
-PROMPT = "Write a Python function that checks if a number is prime and returns True or False"
+PROMPT = "Write a C# function that checks if a number is prime and returns True or False"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 OUTPUT_FILE = SCRIPT_DIR / "results.json"
