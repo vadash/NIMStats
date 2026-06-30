@@ -36,6 +36,10 @@ export const CN_PEAK_UTC_WINDOWS = [
   { start: 6, end: 10 }
 ];
 
+export const EN_NA_PEAK_UTC_WINDOWS = [
+  { start: 12, end: 15 }
+];
+
 export function wrapHour(hour) {
   return ((hour % 24) + 24) % 24;
 }
@@ -86,6 +90,81 @@ export function cnPeakWindowsForHour(hour, windows) {
     seg.start < hour + 1 && seg.end > hour
   ));
 }
+
+export function getEnNaPeakLocalWindows(runs) {
+  const referenceDate = getPeakReferenceDate(runs);
+  return EN_NA_PEAK_UTC_WINDOWS.map(w => {
+    const localStart = utcBoundaryToLocalHour(w.start, referenceDate);
+    const localEnd = utcBoundaryToLocalHour(w.end, referenceDate);
+    const localLabel = `${formatHourBoundary(localStart)}-${formatHourBoundary(localEnd)}`;
+    const utcLabel = `${formatHourBoundary(w.start)}-${formatHourBoundary(w.end)} UTC`;
+    return { ...w, localStart, localEnd, localLabel, utcLabel };
+  });
+}
+
+export function enNaPeakWindowsForHour(hour, windows) {
+  return windows.filter(w => splitHourWindow(w.localStart, w.localEnd).some(seg =>
+    seg.start < hour + 1 && seg.end > hour
+  ));
+}
+
+export const enNaPeakOverlayPlugin = {
+  id: 'enNaPeakOverlay',
+  beforeDatasetsDraw(chart, args, options) {
+    const windows = options?.windows || [];
+    const { ctx, chartArea } = chart;
+    if (!windows.length || !chartArea) return;
+
+    const width = chartArea.right - chartArea.left;
+    ctx.save();
+    for (const w of windows) {
+      for (const seg of splitHourWindow(w.localStart, w.localEnd)) {
+        const left = chartArea.left + (seg.start / 24) * width;
+        const right = chartArea.left + (seg.end / 24) * width;
+        ctx.fillStyle = 'rgba(96,167,242,0.09)';
+        ctx.fillRect(left, chartArea.top, right - left, chartArea.bottom - chartArea.top);
+        ctx.strokeStyle = 'rgba(96,167,242,0.48)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(left, chartArea.top);
+        ctx.lineTo(left, chartArea.bottom);
+        ctx.moveTo(right, chartArea.top);
+        ctx.lineTo(right, chartArea.bottom);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  },
+  afterDatasetsDraw(chart, args, options) {
+    const windows = options?.windows || [];
+    const { ctx, chartArea } = chart;
+    if (!windows.length || !chartArea) return;
+
+    const width = chartArea.right - chartArea.left;
+    ctx.save();
+    ctx.font = '700 10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    for (const w of windows) {
+      for (const seg of splitHourWindow(w.localStart, w.localEnd)) {
+        const left = chartArea.left + (seg.start / 24) * width;
+        const right = chartArea.left + (seg.end / 24) * width;
+        const segWidth = right - left;
+        ctx.strokeStyle = 'rgba(96,167,242,0.75)';
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(left, chartArea.top + 1);
+        ctx.lineTo(right, chartArea.top + 1);
+        ctx.stroke();
+        if (segWidth >= 32) {
+          ctx.fillStyle = 'rgba(96,167,242,0.92)';
+          ctx.fillText(segWidth >= 54 ? 'EN+NA PEAK' : 'EN+NA', left + segWidth / 2, chartArea.top + 5);
+        }
+      }
+    }
+    ctx.restore();
+  }
+};
 
 export const cnPeakOverlayPlugin = {
   id: 'cnPeakOverlay',

@@ -151,11 +151,13 @@ td{padding:10px 14px;color:var(--text);vertical-align:middle}
 .timeslot-pill.yellow{background:var(--warning-dim);border-color:rgba(168,100,0,0.22);color:var(--warning)}
 .timeslot-pill.gray{background:var(--surface-strong);border-color:rgba(95,103,91,0.18);color:var(--text-dim)}
 .timeslot-pill.cn-peak{background:rgba(242,184,75,0.09);border-color:rgba(242,184,75,0.35);color:var(--warning)}
+.timeslot-pill.en-na-peak{background:rgba(96,167,242,0.09);border-color:rgba(96,167,242,0.35);color:#5ca7f2}
 .timeslot-pill .rank{font-size:11px;font-weight:800;color:var(--text-dim)}
 .timeslot-pill .ts-range{color:var(--text)}
 .timeslot-pill .ts-score{font-weight:800}
 .timeslot-pill .ts-conf{opacity:0.75;font-size:10px;text-transform:uppercase;letter-spacing:0.04em}
 .timeslot-pill.cn-peak .ts-range{color:var(--warning)}
+.timeslot-pill.en-na-peak .ts-range{color:#5ca7f2}
 .heatmap{display:grid;gap:4px;margin-top:12px}
 .heatmap-cell{aspect-ratio:1;border-radius:2px;position:relative;cursor:default;transition:transform 0.12s}
 .heatmap-cell:hover{transform:scale(1.22);z-index:10;outline:1px solid var(--text)}

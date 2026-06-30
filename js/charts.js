@@ -1,4 +1,4 @@
-import { CHART_DEFAULTS, cnPeakOverlayPlugin, getCnPeakLocalWindows, cnPeakWindowsForHour, splitHourWindow, wrapHour } from './constants.js';
+import { CHART_DEFAULTS, cnPeakOverlayPlugin, enNaPeakOverlayPlugin, getCnPeakLocalWindows, cnPeakWindowsForHour, getEnNaPeakLocalWindows, enNaPeakWindowsForHour, splitHourWindow, wrapHour } from './constants.js';
 import { state } from './state.js';
 import { avg, modelColor, destroyChart } from './helpers.js';
 import { computeHourlyStats, computeBestTimeslots } from './data.js';
@@ -15,6 +15,7 @@ export function renderBestTimeslot() {
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
   const dataSec = smoothed.map(v => v / 1000);
   const cnPeakWindows = getCnPeakLocalWindows(state.runs);
+  const enNaPeakWindows = getEnNaPeakLocalWindows(state.runs);
 
   const minVal = Math.min(...smoothed);
   const maxVal = Math.max(...smoothed);
@@ -60,11 +61,11 @@ export function renderBestTimeslot() {
         borderRadius: 3,
       }]
     },
-    plugins: [cnPeakOverlayPlugin],
+    plugins: [cnPeakOverlayPlugin, enNaPeakOverlayPlugin],
     options: {
       responsive: true, maintainAspectRatio: false,
       layout: { padding: { top: 16 } },
-      plugins: { legend: { display: false }, cnPeakOverlay: { windows: cnPeakWindows }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+      plugins: { legend: { display: false }, cnPeakOverlay: { windows: cnPeakWindows }, enNaPeakOverlay: { windows: enNaPeakWindows }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
         title: (items) => `Hour ${items[0].label}:00`,
         label: (item) => {
           const h = item.dataIndex;
@@ -74,6 +75,10 @@ export function renderBestTimeslot() {
           const peakHits = cnPeakWindowsForHour(h, cnPeakWindows);
           if (peakHits.length) {
             lines.push(`CN peak: ${peakHits.map(w => w.localLabel).join(', ')} local`);
+          }
+          const enNaHits = enNaPeakWindowsForHour(h, enNaPeakWindows);
+          if (enNaHits.length) {
+            lines.push(`EN+NA peak: ${enNaHits.map(w => w.localLabel).join(', ')} local`);
           }
           return lines;
         }
@@ -92,8 +97,13 @@ export function renderBestTimeslot() {
       <span class="ts-range">${w.localLabel}</span>
       <span class="ts-conf">LOCAL</span>
     </div>`).join('');
+  const enNaPeakPills = enNaPeakWindows.map(w => `<div class="timeslot-pill en-na-peak" title="${w.utcLabel}">
+      <span class="rank">EN+NA</span>
+      <span class="ts-range">${w.localLabel}</span>
+      <span class="ts-conf">LOCAL</span>
+    </div>`).join('');
   if (!bestSlots.length) {
-    recsEl.innerHTML = '<span class="no-data">Not enough data yet</span>' + cnPeakPills;
+    recsEl.innerHTML = '<span class="no-data">Not enough data yet</span>' + cnPeakPills + enNaPeakPills;
     return;
   }
   const rankLabels = ['01', '02', '03'];
@@ -109,5 +119,5 @@ export function renderBestTimeslot() {
       <span class="ts-score">${zone.score}</span>
       <span class="ts-conf">${confidence}</span>
     </div>`;
-  }).join('') + cnPeakPills;
+  }).join('') + cnPeakPills + enNaPeakPills;
 }
