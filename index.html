@@ -320,7 +320,7 @@ td{padding:10px 14px;color:var(--text);vertical-align:middle}
     <div id="error-state">
       <div class="err-icon">ERR</div>
       <h2>Failed to load benchmark data</h2>
-      <p id="error-msg">Could not fetch history.db. Make sure the file exists and you're serving this page via HTTP.</p>
+      <p id="error-msg">Could not fetch history.db.gz. Make sure the file exists and you're serving this page via HTTP.</p>
     </div>
 
     <!-- OVERVIEW -->
@@ -1774,9 +1774,10 @@ async function init() {
       locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
     });
 
-    const res = await fetch('history.db');
+    const res = await fetch('history.db.gz');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const buf = await res.arrayBuffer();
+    const ds = new DecompressionStream('gzip');
+    const buf = await new Response(res.body.pipeThrough(ds)).arrayBuffer();
     state.db = new SQL.Database(new Uint8Array(buf));
 
     const data = loadFromDb(state.db);
@@ -1834,7 +1835,7 @@ async function init() {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').classList.add('visible');
     document.getElementById('error-state').style.display = 'flex';
-    document.getElementById('error-msg').textContent = `Error: ${err.message}. Make sure history.db exists and you're serving via HTTP.`;
+    document.getElementById('error-msg').textContent = `Error: ${err.message}. Make sure history.db.gz exists and you're serving via HTTP.`;
     console.error('Failed to load data:', err);
   }
 }
