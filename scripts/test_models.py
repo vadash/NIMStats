@@ -16,12 +16,11 @@ from db_utils import write_run  # noqa: E402
 
 API_BASE = os.getenv("API_BASE", "https://integrate.api.nvidia.com/v1")
 API_KEY = os.getenv("NIM_API_KEY", "")
-MODEL_GROUP = os.getenv("MODEL_GROUP", "all")
+MODEL_INDEX = os.getenv("MODEL_INDEX")  # set by dispatch to test a single model
 REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "300"))
 PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and returns a bool. Use a traditional for loop checking divisibility up to the square root of the number. Do not use advanced pattern matching, LINQ, top-level statements, or external libraries. Provide only the valid C# code inside a markdown code block, with absolutely no introductory, explanatory, or concluding text."
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-OUTPUT_FILE = SCRIPT_DIR / "results.json"
 
 ALL_MODELS = [
     "z-ai/glm-5.1",
@@ -31,15 +30,14 @@ ALL_MODELS = [
     "openai/gpt-oss-120b",
 ]
 
-GROUP1_MODELS = ALL_MODELS[:2]
-
-GROUP2_MODELS = ALL_MODELS[2:]
 
 def selected_models() -> list[str]:
-    if MODEL_GROUP == "group1":
-        return GROUP1_MODELS
-    if MODEL_GROUP == "group2":
-        return GROUP2_MODELS
+    if MODEL_INDEX is not None:
+        idx = int(MODEL_INDEX)
+        if 0 <= idx < len(ALL_MODELS):
+            return [ALL_MODELS[idx]]
+        print(f"Error: MODEL_INDEX={idx} out of range (0-{len(ALL_MODELS)-1})", file=sys.stderr)
+        sys.exit(1)
     return ALL_MODELS
 
 
@@ -227,10 +225,10 @@ def main() -> int:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     runtime_prompt = build_runtime_prompt()
 
-    group_label = f" (Group: {MODEL_GROUP})" if MODEL_GROUP else ""
-    print(f"Starting NVIDIA NIM Model Benchmarks{group_label}...")
+    mode_label = f" (model {MODEL_INDEX}: {models[0]})" if MODEL_INDEX is not None else ""
+    print(f"Starting NVIDIA NIM Model Benchmarks{mode_label}...")
     print(f"Timestamp: {timestamp}")
-    print(f"Testing {len(models)} models...")
+    print(f"Testing {len(models)} model(s)...")
     print()
 
     results: list[dict[str, Any]] = []
@@ -250,14 +248,20 @@ def main() -> int:
     print("Compiling results...")
 
     final_json = compile_output(timestamp, runtime_prompt, results)
-    OUTPUT_FILE.write_text(json.dumps(final_json, indent=2), encoding="utf-8")
+
+    if MODEL_INDEX is not None:
+        output_file = SCRIPT_DIR / f"results-worker{MODEL_INDEX}.json"
+    else:
+        output_file = SCRIPT_DIR / "results.json"
+
+    output_file.write_text(json.dumps(final_json, indent=2), encoding="utf-8")
 
     success_count = final_json["summary"]["successCount"]
     total_count = final_json["summary"]["totalModels"]
-    print(f"Results saved to {OUTPUT_FILE.name}")
+    print(f"Results saved to {output_file.name}")
     print(f"Summary: {success_count}/{total_count} successful")
 
-    if MODEL_GROUP == "all":
+    if MODEL_INDEX is None:
         update_history(final_json)
 
     return 0

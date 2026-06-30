@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Merge parallel group results and append a single run to history.db."""
+"""Merge parallel worker results and append a single run to history.db."""
 
 import json
 import sys
@@ -15,19 +15,22 @@ def main() -> int:
     all_models: list[dict] = []
     timestamp: str | None = None
     prompt: str | None = None
+    worker_files = sorted(SCRIPT_DIR.glob("results-worker*.json"))
 
-    for group_file in ["results-group1.json", "results-group2.json"]:
-        path = SCRIPT_DIR / group_file
-        if path.exists():
-            with open(path) as f:
-                data = json.load(f)
-            all_models.extend(data.get("models", []))
-            if not timestamp:
-                timestamp = data.get("timestamp")
-                prompt = data.get("prompt")
+    if not worker_files:
+        print("No worker result files found!", file=sys.stderr)
+        return 1
+
+    for path in worker_files:
+        with open(path) as f:
+            data = json.load(f)
+        all_models.extend(data.get("models", []))
+        if not timestamp:
+            timestamp = data.get("timestamp")
+            prompt = data.get("prompt")
 
     if not all_models:
-        print("No results found!", file=sys.stderr)
+        print("No model results found in worker files!", file=sys.stderr)
         return 1
 
     success_count = sum(1 for m in all_models if m.get("success"))
@@ -54,13 +57,11 @@ def main() -> int:
     }
 
     write_run(merged_run)
-    print(f"✓ Updated history.db with new run ({success_count}/{total_count} models passed)")
+    print(f"Updated history.db with new run ({success_count}/{total_count} models passed)")
 
-    for group_file in ["results-group1.json", "results-group2.json"]:
-        path = SCRIPT_DIR / group_file
-        if path.exists():
-            path.unlink()
-    print("✓ Cleaned up temporary group files")
+    for path in worker_files:
+        path.unlink()
+    print("Cleaned up temporary worker files")
 
     return 0
 

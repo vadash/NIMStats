@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test_group1:
+  benchmark:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -13,61 +13,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       
-      - name: Test model group 1
+      - name: Run parallel benchmarks
         env:
           NIM_API_KEY: ${{ secrets.NIM_API_KEY }}
-          MODEL_GROUP: group1
-        run: python3 scripts/test_models.py
-      
-      - name: Upload group1 results
-        uses: actions/upload-artifact@v7
-        with:
-          name: results-group1
-          path: scripts/results.json
-          retention-days: 1
+          PARALLEL: 2
+        run: bash scripts/benchmark_dispatch.sh
 
-  test_group2:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      
-      - name: Test model group 2
-        env:
-          NIM_API_KEY: ${{ secrets.NIM_API_KEY }}
-          MODEL_GROUP: group2
-        run: python3 scripts/test_models.py
-      
-      - name: Upload group2 results
-        uses: actions/upload-artifact@v7
-        with:
-          name: results-group2
-          path: scripts/results.json
-          retention-days: 1
-
-  merge_and_update:
-    needs: [test_group1, test_group2]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-      
-      - name: Download all results
-        uses: actions/download-artifact@v8
-        with:
-          path: scripts/
-      
       - name: Merge results and update history
-        run: |
-          mv scripts/results-group1/results.json scripts/results-group1.json || true
-          mv scripts/results-group2/results.json scripts/results-group2.json || true
-          python3 scripts/merge_results.py
+        run: python3 scripts/merge_results.py
 
       - name: Compress history.db to gzip
         run: gzip -kf history.db
