@@ -720,18 +720,38 @@ function categorizeError(err) {
 }
 
 function computeHourlyStats() {
-  const hourData = Array.from({ length: 24 }, () => []);
+  const hourWeightedSum = Array(24).fill(0);
+  const hourWeightTotal = Array(24).fill(0);
   const hourRealCount = Array(24).fill(0);
   const hourFailCount = Array(24).fill(0);
+  const hourFailWeight = Array(24).fill(0);
+
+  // Reference timestamp = most recent run (for time-decay weighting)
+  let latestTs = 0;
+  for (const run of state.runs) {
+    if (run.timestamp > latestTs) latestTs = run.timestamp;
+  }
+
+  // Weight: full for 0-7d, linear decay 1.0 -> 0.3 over 7-30d, floor 0.3 beyond
+  const weightFor = (ts) => {
+    if (!latestTs) return 1.0;
+    const daysAgo = (latestTs - ts) / 86400000;
+    if (daysAgo <= 7) return 1.0;
+    if (daysAgo < 30) return 1.0 - 0.7 * (daysAgo - 7) / 23;
+    return 0.3;
+  };
 
   for (const run of state.runs) {
     const localHour = new Date(run.timestamp).getHours();
+    const w = weightFor(run.timestamp);
     for (const m of run.models) {
       if (m.success && m.responseTime > 0) {
-        hourData[localHour].push(m.responseTime);
+        hourWeightedSum[localHour] += m.responseTime * w;
+        hourWeightTotal[localHour] += w;
         hourRealCount[localHour]++;
       } else if (!m.success) {
         hourFailCount[localHour]++;
+        hourFailWeight[localHour] += w;
       }
     }
   }
@@ -739,49 +759,54 @@ function computeHourlyStats() {
   const hourAvg = Array(24).fill(0);
   const hoursWithData = [];
   for (let h = 0; h < 24; h++) {
-    if (hourData[h].length > 0) {
-      hourAvg[h] = avg(hourData[h]);
+    if (hourWeightTotal[h] > 0) {
+      hourAvg[h] = hourWeightedSum[h] / hourWeightTotal[h];
       hoursWithData.push(hourAvg[h]);
     }
   }
   const globalMean = hoursWithData.length ? avg(hoursWithData) : 0;
 
   for (let h = 0; h < 24; h++) {
-    if (hourData[h].length === 0 && hourFailCount[h] === 0) {
+    if (hourWeightTotal[h] === 0 && hourFailCount[h] === 0) {
       hourAvg[h] = globalMean;
     }
   }
 
-  // Penalize hours with failures by pushing failed models as 2x global mean
+  // Penalize hours with failures by pushing failed models as 2x global mean (weight-scaled)
   for (let h = 0; h < 24; h++) {
     if (hourFailCount[h] > 0) {
       const penalty = 2 * (globalMean || 1);
-      for (let i = 0; i < hourFailCount[h]; i++) {
-        hourData[h].push(penalty);
-      }
-      hourAvg[h] = avg(hourData[h]);
+      const totalW = hourWeightTotal[h] + hourFailWeight[h];
+      const totalSum = hourWeightedSum[h] + penalty * hourFailWeight[h];
+      hourAvg[h] = totalW > 0 ? totalSum / totalW : penalty;
     }
   }
 
   const isReal = Array(24).fill(true);
   for (let h = 0; h < 24; h++) {
-    if (hourData[h].length === 0) {
+    if (hourWeightTotal[h] === 0) {
       isReal[h] = false;
     }
   }
 
-  // 3-hour moving average smoothing
+  // Weighted smoothing: 5-hour (1,2,3,2,1)/9 default, 7-hour (1,1,2,3,2,1,1)/11 for sparse hours
   const smoothed = Array(24).fill(0);
   for (let h = 0; h < 24; h++) {
-    const prev = hourAvg[(h - 1 + 24) % 24];
-    const curr = hourAvg[h];
-    const next = hourAvg[(h + 1) % 24];
-    smoothed[h] = (prev + curr + next) / 3;
+    const sparse = hourRealCount[h] < 3;
+    const offsets = sparse ? [-3, -2, -1, 0, 1, 2, 3] : [-2, -1, 0, 1, 2];
+    const weights = sparse ? [1, 1, 2, 3, 2, 1, 1] : [1, 2, 3, 2, 1];
+    let sum = 0, wsum = 0;
+    for (let i = 0; i < offsets.length; i++) {
+      sum += hourAvg[(h + offsets[i] + 24) % 24] * weights[i];
+      wsum += weights[i];
+    }
+    smoothed[h] = sum / wsum;
   }
 
-  const sampleCounts = hourData.map(d => d.length);
+  // Effective "recent" sample count = sum of time-decay weights per hour
+  const weightedCounts = hourWeightTotal.map(w => Math.round(w));
 
-  return { hourAvg, smoothed, isReal, hourRealCount, sampleCounts, hourFailCount };
+  return { hourAvg, smoothed, isReal, hourRealCount, weightedCounts, hourFailCount };
 }
 
 function computeBestTimeslots(hourlyStats) {
@@ -1038,7 +1063,7 @@ function processData(data) {
 function renderBestTimeslot() {
   const hourlyStats = computeHourlyStats();
   const bestSlots = computeBestTimeslots(hourlyStats);
-  const { smoothed, sampleCounts, hourFailCount } = hourlyStats;
+  const { smoothed, weightedCounts, hourFailCount } = hourlyStats;
 
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
   const dataSec = smoothed.map(v => v / 1000);
@@ -1100,7 +1125,7 @@ function renderBestTimeslot() {
           const h = item.dataIndex;
           const fails = hourFailCount[h];
           const failStr = fails > 0 ? ` | ${fails} failed` : '';
-          const lines = [`Avg: ${item.raw.toFixed(2)}s (${sampleCounts[h]} samples${failStr})`];
+          const lines = [`Avg: ${item.raw.toFixed(2)}s (${weightedCounts[h]} recent samples${failStr})`];
           const peakHits = cnPeakWindowsForHour(h, cnPeakWindows);
           if (peakHits.length) {
             lines.push(`CN peak: ${peakHits.map(w => w.localLabel).join(', ')} local`);
