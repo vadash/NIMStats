@@ -11,7 +11,7 @@ import { switchTab } from './nav.js';
 async function init() {
   try {
     const SQL = await initSqlJs({
-      locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+      locateFile: file => `vendor/${file}`
     });
 
     const res = await fetch('history.db.gz');

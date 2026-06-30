@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# pre-commit hook: prevent CDN/ESM/Google external references in project source
+set -euo pipefail
+
+RED='\033[0;31m'
+NC='\033[0m'
+
+FOUND=0
+
+# Patterns that indicate CDN/external loading
+PATTERNS=(
+  'fonts\.googleapis\.com'
+  'fonts\.gstatic\.com'
+  'cdn\.jsdelivr\.net'
+  'cdnjs\.cloudflare\.com'
+  'unpkg\.com'
+  'esm\.sh'
+  'cdn\.esm\.sh'
+  'googleapis\.com/ajax'
+)
+
+# Build regex alternation for grep
+REGEX=$(printf '%s|' "${PATTERNS[@]}")
+REGEX="${REGEX%|}"
+
+# Check staged source files (not vendor/)
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -vE '^(vendor|docs)/' || true)
+if [ -n "$STAGED" ]; then
+  MATCHES=$(echo "$STAGED" | xargs grep -nE "$REGEX" 2>/dev/null || true)
+  if [ -n "$MATCHES" ]; then
+    echo -e "${RED}ERROR: Staged files contain CDN/ESM external references:${NC}"
+    echo "$MATCHES"
+    FOUND=1
+  fi
+fi
+
+# Check vendor/ files for CDN URLs that might pull in more deps at runtime
+VENDOR_FILES=$(git diff --cached --name-only --diff-filter=ACM -- vendor/ | grep -vE '\.(woff2?|ttf|otf|wasm|map)$' || true)
+if [ -n "$VENDOR_FILES" ]; then
+  VENDOR_MATCHES=$(echo "$VENDOR_FILES" | xargs grep -nE "https?://" 2>/dev/null | grep -vE '^\s*(//|\*|/\*)' || true)
+  # Filter out comment-only lines, check for actual fetch/src/url patterns
+  RUNTIME_REFS=$(echo "$VENDOR_FILES" | xargs grep -nE "(src\s*[:=]|fetch\(|importScripts|locateFile|url\().*https?://" 2>/dev/null || true)
+  if [ -n "$RUNTIME_REFS" ]; then
+    echo -e "${RED}ERROR: Vendor files contain runtime CDN references:${NC}"
+    echo "$RUNTIME_REFS"
+    FOUND=1
+  fi
+fi
+
+if [ "$FOUND" -ne 0 ]; then
+  echo ""
+  echo "All dependencies must be vendored locally (vendor/)."
+  echo "If you added a new dependency, download it to vendor/ and reference it locally."
+  exit 1
+fi
+
+exit 0
