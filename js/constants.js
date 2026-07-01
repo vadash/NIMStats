@@ -36,7 +36,7 @@ export const CN_PEAK_UTC_WINDOWS = [
   { start: 6, end: 10 }
 ];
 
-export const EN_NA_PEAK_UTC_WINDOWS = [
+export const EU_NA_PEAK_UTC_WINDOWS = [
   { start: 12, end: 15 }
 ];
 
@@ -91,9 +91,9 @@ export function cnPeakWindowsForHour(hour, windows) {
   ));
 }
 
-export function getEnNaPeakLocalWindows(runs) {
+export function getEuNaPeakLocalWindows(runs) {
   const referenceDate = getPeakReferenceDate(runs);
-  return EN_NA_PEAK_UTC_WINDOWS.map(w => {
+  return EU_NA_PEAK_UTC_WINDOWS.map(w => {
     const localStart = utcBoundaryToLocalHour(w.start, referenceDate);
     const localEnd = utcBoundaryToLocalHour(w.end, referenceDate);
     const localLabel = `${formatHourBoundary(localStart)}-${formatHourBoundary(localEnd)}`;
@@ -102,14 +102,14 @@ export function getEnNaPeakLocalWindows(runs) {
   });
 }
 
-export function enNaPeakWindowsForHour(hour, windows) {
+export function euNaPeakWindowsForHour(hour, windows) {
   return windows.filter(w => splitHourWindow(w.localStart, w.localEnd).some(seg =>
     seg.start < hour + 1 && seg.end > hour
   ));
 }
 
-export const enNaPeakOverlayPlugin = {
-  id: 'enNaPeakOverlay',
+export const euNaPeakOverlayPlugin = {
+  id: 'euNaPeakOverlay',
   beforeDatasetsDraw(chart, args, options) {
     const windows = options?.windows || [];
     const { ctx, chartArea } = chart;
@@ -158,7 +158,7 @@ export const enNaPeakOverlayPlugin = {
         ctx.stroke();
         if (segWidth >= 32) {
           ctx.fillStyle = 'rgba(96,167,242,0.92)';
-          ctx.fillText(segWidth >= 54 ? 'EN+NA PEAK' : 'EN+NA', left + segWidth / 2, chartArea.top + 5);
+          ctx.fillText(segWidth >= 54 ? 'EU+NA PEAK' : 'EU+NA', left + segWidth / 2, chartArea.top + 5);
         }
       }
     }
@@ -220,6 +220,34 @@ export const cnPeakOverlayPlugin = {
         }
       }
     }
+    ctx.restore();
+  }
+};
+
+export const currentTimeLinePlugin = {
+  id: 'currentTimeLine',
+  afterDatasetsDraw(chart) {
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea) return;
+
+    const now = new Date();
+    const currentHour = now.getHours() + now.getMinutes() / 60;
+    const x = scales.x.getPixelForValue(Math.floor(currentHour));
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(139,209,31,0.65)';
+    ctx.setLineDash([6, 3]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, chartArea.top);
+    ctx.lineTo(x, chartArea.bottom);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(139,209,31,0.9)';
+    ctx.font = '700 9px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('NOW', x, chartArea.top - 4);
     ctx.restore();
   }
 };
