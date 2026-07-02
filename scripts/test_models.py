@@ -23,7 +23,6 @@ PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and r
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 ALL_MODELS = [
-    "moonshotai/kimi-k2.6",
     "nvidia/nemotron-3-ultra-550b-a55b",
     "nvidia/nemotron-3-super-120b-a12b",
     "openai/gpt-oss-120b",
@@ -38,6 +37,7 @@ ALL_MODELS = [
 
 ## DEADGE
 # "z-ai/glm-5.1",
+# "moonshotai/kimi-k2.6",
 ## TOO SLOW
 
 
@@ -247,10 +247,10 @@ def main() -> int:
         result = call_model(model, runtime_prompt)
         if result.get("success"):
             print(
-                f"  ✓ Success ({result['responseTime']}ms, {result.get('tokensGenerated', 0)} tokens)"
+                f"  [OK] Success ({result['responseTime']}ms, {result.get('tokensGenerated', 0)} tokens)"
             )
         else:
-            print(f"  ✗ Failed: {result.get('error') or 'Unknown error'}")
+            print(f"  [FAIL] Failed: {result.get('error') or 'Unknown error'}")
         results.append(result)
         time.sleep(0.5)
 
