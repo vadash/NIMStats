@@ -30,6 +30,8 @@ ALL_MODELS = [
     "minimaxai/minimax-m3",
     "minimaxai/minimax-m2.7",
     "stepfun-ai/step-3.7-flash",
+    "deepseek-ai/deepseek-v4-pro",
+    "deepseek-ai/deepseek-v4-flash",
     "qwen/qwen3.5-397b-a17b",
     "qwen/qwen3.5-122b-a10b",
 ]
