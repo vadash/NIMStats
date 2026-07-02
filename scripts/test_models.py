@@ -2,6 +2,7 @@
 
 import json
 import os
+import random
 import sys
 import time
 import urllib.error
@@ -48,7 +49,9 @@ def selected_models() -> list[str]:
             return [ALL_MODELS[idx]]
         print(f"Error: MODEL_INDEX={idx} out of range (0-{len(ALL_MODELS)-1})", file=sys.stderr)
         sys.exit(1)
-    return ALL_MODELS
+    models = list(ALL_MODELS)
+    random.shuffle(models)
+    return models
 
 
 def build_runtime_prompt() -> str:

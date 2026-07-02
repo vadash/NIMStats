@@ -17,6 +17,9 @@ for i in $(seq 0 $((TOTAL_MODELS - 1))); do
     queue+=("$i")
 done
 
+# Shuffle queue so benchmark order is random
+queue=($(printf '%s\n' "${queue[@]}" | shuf))
+
 # Active workers: assoc array pid -> model_index
 declare -A active_pids=()
 
