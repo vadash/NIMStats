@@ -173,6 +173,7 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
                 content = normalize_content(message.get("content"))
 
     if not content.strip():
+        print(f"DEBUG: Raw response: {raw_body[:500]}", file=sys.stderr)
         return failure_result(model, "No content in response")
 
     usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
