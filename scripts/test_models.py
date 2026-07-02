@@ -36,8 +36,10 @@ ALL_MODELS = [
     "qwen/qwen3.5-122b-a10b",
 ]
 
-# DEAD
+## DEADGE
 # "z-ai/glm-5.1",
+## TOO SLOW
+
 
 def selected_models() -> list[str]:
     if MODEL_INDEX is not None:
