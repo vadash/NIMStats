@@ -23,13 +23,19 @@ PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and r
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 ALL_MODELS = [
-    "z-ai/glm-5.1",
     "moonshotai/kimi-k2.6",
     "nvidia/nemotron-3-ultra-550b-a55b",
     "nvidia/nemotron-3-super-120b-a12b",
     "openai/gpt-oss-120b",
+    "minimaxai/minimax-m3",
+    "minimaxai/minimax-m2.7",
+    "stepfun-ai/step-3.7-flash",
+    "qwen/qwen3.5-397b-a17b",
+    "qwen/qwen3.5-122b-a10b",
 ]
 
+# DEAD
+# "z-ai/glm-5.1",
 
 def selected_models() -> list[str]:
     if MODEL_INDEX is not None:
