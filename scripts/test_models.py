@@ -24,6 +24,7 @@ PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and r
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 ALL_MODELS = [
+    "z-ai/glm-5.2",
     "nvidia/nemotron-3-ultra-550b-a55b",
     "nvidia/nemotron-3-super-120b-a12b",
     "openai/gpt-oss-120b",
@@ -40,7 +41,7 @@ ALL_MODELS = [
 # "z-ai/glm-5.1",
 # "moonshotai/kimi-k2.6",
 ## TOO SLOW
-
+# qwen 3.5 seems to be slow, watching
 
 def selected_models() -> list[str]:
     if MODEL_INDEX is not None:
