@@ -171,6 +171,8 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
             message = first_choice.get("message")
             if isinstance(message, dict):
                 content = normalize_content(message.get("content"))
+                if not content.strip():
+                    content = normalize_content(message.get("reasoning_content"))
 
     if not content.strip():
         print(f"DEBUG: Raw response: {raw_body[:500]}", file=sys.stderr)
