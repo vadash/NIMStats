@@ -3,6 +3,25 @@ import { state } from '../state.js';
 import { shortModel, providerMeta, providerChip, fmtTimestamp, fmtTimestampShort, destroyChart, modelColor, escHtml } from '../helpers.js';
 import { openModal } from '../modal.js';
 
+const RESPONSE_AVG_WINDOW = 12;
+
+function rollingAverage(values, windowSize) {
+  let sum = 0;
+  let count = 0;
+  return values.map((v, i) => {
+    if (v != null) {
+      sum += v;
+      count++;
+    }
+    const expired = values[i - windowSize];
+    if (i >= windowSize && expired != null) {
+      sum -= expired;
+      count--;
+    }
+    return count ? sum / count : null;
+  });
+}
+
 export function populateExplorerSelect() {
   const sel = document.getElementById('explorer-select');
   const sorted = [...state.modelNames].sort((a,b) => state.modelStats[b].score - state.modelStats[a].score);
@@ -43,6 +62,8 @@ export function renderExplorer() {
   // Response time chart
   const labels = state.runs.map(r => fmtTimestampShort(r.timestamp));
   const timeData = s.responseTimes.map(v => v != null ? v / 1000 : null);
+  const avgTimeData = rollingAverage(timeData, RESPONSE_AVG_WINDOW);
+  const rawColor = modelColor(model);
 
   destroyChart('explorerTime');
   state.charts.explorerTime = new Chart(document.getElementById('chart-explorer-time'), {
@@ -50,22 +71,49 @@ export function renderExplorer() {
     data: {
       labels,
       datasets: [{
-        label: 'Response Time (s)',
-        data: timeData,
-        borderColor: modelColor(model),
-        backgroundColor: modelColor(model) + '14',
+        label: `${RESPONSE_AVG_WINDOW}-run average`,
+        data: avgTimeData,
+        borderColor: '#8bd11f',
+        backgroundColor: '#8bd11f1f',
         fill: true,
-        tension: 0.2,
+        tension: 0.45,
+        spanGaps: true,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHitRadius: 8,
+        borderWidth: 3,
+      }, {
+        label: 'Raw runs',
+        data: timeData,
+        borderColor: rawColor + '66',
+        backgroundColor: rawColor + '14',
+        fill: false,
+        hidden: true,
+        tension: 0.18,
         spanGaps: false,
-        pointRadius: timeData.map(v => v != null ? 3 : 0),
+        pointRadius: timeData.map(v => v != null ? 2 : 0),
         pointHoverRadius: 5,
-        borderWidth: 2,
+        borderWidth: 1.5,
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-        label: (item) => item.raw != null ? `${item.raw.toFixed(2)}s` : 'Failed'
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: {
+        display: true,
+        align: 'end',
+        labels: {
+          boxWidth: 22,
+          color: '#c7d1bf',
+          font: { size: 11 },
+          usePointStyle: true,
+          pointStyle: 'line'
+        }
+      }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
+        label: (item) => {
+          if (item.raw == null) return item.dataset.label === 'Raw runs' ? 'Raw runs: failed' : `${item.dataset.label}: no successes`;
+          return `${item.dataset.label}: ${item.raw.toFixed(2)}s`;
+        }
       }}},
       scales: {
         x: { display: false },
