@@ -24,24 +24,27 @@ PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and r
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 ALL_MODELS = [
-    "z-ai/glm-5.2",
-    "nvidia/nemotron-3-ultra-550b-a55b",
+    # SOTA
+    "z-ai/glm-5.2", # A bit quantized
+    # good for text processing
     "nvidia/nemotron-3-super-120b-a12b",
-    "openai/gpt-oss-120b",
+    "openai/gpt-oss-120b",    
+    # mid tier
     "minimaxai/minimax-m3",
-    "minimaxai/minimax-m2.7",
     "stepfun-ai/step-3.7-flash",
-    "deepseek-ai/deepseek-v4-pro",
-    "deepseek-ai/deepseek-v4-flash",
     "qwen/qwen3.5-397b-a17b",
     "qwen/qwen3.5-122b-a10b",
+    # shit tier
+    "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
 ]
 
 ## DEADGE
-# "z-ai/glm-5.1",
-# "moonshotai/kimi-k2.6",
+# "z-ai/glm-5.1", # replaced by glm52, nice
+# "moonshotai/kimi-k2.6", # hopefully we will get kimi27
 ## TOO SLOW
-# qwen 3.5 seems to be slow, watching
+# "minimaxai/minimax-m2.7", # 47s average
+# "deepseek-ai/deepseek-v4-pro", # 49s average
+# "deepseek-ai/deepseek-v4-flash", # 35s average, low uptime and sub 10 tps
 
 def selected_models() -> list[str]:
     if MODEL_INDEX is not None:
