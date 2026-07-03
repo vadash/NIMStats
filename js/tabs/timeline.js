@@ -37,7 +37,7 @@ export function renderTimeline() {
         <span class="run-expand-arrow">v</span>
       </div>
       <div class="run-card-body">
-        <div class="run-prompt">Prompt: ${escHtml((run.prompt||'').slice(0,120))}${(run.prompt||'').length > 120 ? '...' : ''}</div>
+        <div class="run-prompt">Prompt: ${escHtml(run.prompt||'')}</div>
         <table class="run-detail-table">
           <thead><tr><th>Model</th><th>Status</th><th>Response Time</th><th>Tok/s</th><th>Error</th></tr></thead>
           <tbody>${run.models.map(m => {
