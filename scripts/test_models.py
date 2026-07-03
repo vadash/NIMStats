@@ -102,9 +102,9 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
     payload = {
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-        "top_p": 0.9,
-        "max_tokens": 500,
+        "temperature": 1.0,
+        "top_p": 1.0,
+        "max_tokens": 1000,
         "stream": False,
     }
     body = json.dumps(payload).encode("utf-8")
