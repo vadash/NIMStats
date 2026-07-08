@@ -31,6 +31,8 @@ ALL_MODELS = [
     "openai/gpt-oss-120b",    
     # mid tier
     "minimaxai/minimax-m3",
+    "mistralai/mistral-large-3-675b-instruct-2512",
+    "mistralai/mistral-medium-3.5-128b",
     "stepfun-ai/step-3.7-flash",
     "qwen/qwen3.5-397b-a17b",
     "qwen/qwen3.5-122b-a10b",

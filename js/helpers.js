@@ -75,6 +75,110 @@ export function destroyChart(key) {
   }
 }
 
+export const RESPONSE_AVG_WINDOW = 12;
+export const EXPLORER_RESPONSE_COLORS = ['#8bd11f', '#5ca7f2'];
+export const COMPARE_RESPONSE_COLORS = ['#8bd11f', '#5ca7f2', '#f2b84b', '#b98cff'];
+
+function latestRunTime(runs = state.runs) {
+  return runs.reduce((latest, run) => {
+    const ts = Date.parse(run.timestamp);
+    return Number.isNaN(ts) ? latest : Math.max(latest, ts);
+  }, 0);
+}
+
+export function hasRecentData(model, modelStats = state.modelStats, runs = state.runs) {
+  const latest = latestRunTime(runs);
+  if (!latest) return false;
+
+  const results = modelStats[model]?.results || [];
+  for (let i = results.length - 1; i >= 0; i--) {
+    if (!results[i]) continue;
+    const tested = Date.parse(runs[i]?.timestamp);
+    return !Number.isNaN(tested) && latest - tested <= 24 * 60 * 60 * 1000;
+  }
+
+  const seen = Date.parse(modelStats[model]?.lastSeen || '');
+  return !Number.isNaN(seen) && latest - seen <= 24 * 60 * 60 * 1000;
+}
+
+export function compareLiveStatus(a, b, modelStats = state.modelStats, runs = state.runs) {
+  const aLive = hasRecentData(a.model || a, modelStats, runs);
+  const bLive = hasRecentData(b.model || b, modelStats, runs);
+  return Number(bLive) - Number(aLive);
+}
+
+export function sortModelsByLiveScore(models, modelStats = state.modelStats, runs = state.runs) {
+  return [...models].sort((a, b) => {
+    const liveSort = compareLiveStatus(a, b, modelStats, runs);
+    if (liveSort) return liveSort;
+    const scoreSort = (modelStats[b]?.score ?? -Infinity) - (modelStats[a]?.score ?? -Infinity);
+    return scoreSort || a.localeCompare(b);
+  });
+}
+
+export function rollingAverage(values, windowSize = RESPONSE_AVG_WINDOW) {
+  let sum = 0;
+  let count = 0;
+  return values.map((v, i) => {
+    if (v != null) {
+      sum += v;
+      count++;
+    }
+    const expired = values[i - windowSize];
+    if (i >= windowSize && expired != null) {
+      sum -= expired;
+      count--;
+    }
+    return count ? sum / count : null;
+  });
+}
+
+export function responseTimeSeconds(responseTimes) {
+  return responseTimes.map(v => v != null ? v / 1000 : null);
+}
+
+export function responseTimeDatasets(series, colors) {
+  return series.flatMap((item, i) => {
+    const rawData = responseTimeSeconds(item.responseTimes);
+    const smoothColor = colors[i];
+    const rawColor = colors[i + series.length];
+    return [{
+      label: item.label,
+      data: rollingAverage(rawData),
+      borderColor: smoothColor,
+      backgroundColor: smoothColor + '1f',
+      fill: item.fill ?? false,
+      tension: 0.45,
+      spanGaps: true,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      pointHitRadius: 8,
+      borderWidth: 3,
+    }, {
+      label: `${item.label} raw`,
+      data: rawData,
+      borderColor: rawColor + '8a',
+      backgroundColor: rawColor + '14',
+      fill: false,
+      hidden: true,
+      tension: 0.18,
+      spanGaps: false,
+      pointRadius: rawData.map(v => v != null ? 2 : 0),
+      pointHoverRadius: 5,
+      borderWidth: 1.5,
+    }];
+  });
+}
+
+export function responseTimeTooltipLabel(item) {
+  if (item.raw == null) {
+    return item.dataset.label.endsWith(' raw')
+      ? `${item.dataset.label}: failed`
+      : `${item.dataset.label}: no successes`;
+  }
+  return `${item.dataset.label}: ${item.raw.toFixed(2)}s`;
+}
+
 export function animateCounter(el, target, duration = 1200, decimals = 0, suffix = '') {
   const start = performance.now();
   const update = (now) => {

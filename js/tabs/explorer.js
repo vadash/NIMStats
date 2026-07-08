@@ -1,30 +1,11 @@
 import { CHART_DEFAULTS } from '../constants.js';
 import { state } from '../state.js';
-import { shortModel, providerMeta, providerChip, fmtTimestamp, fmtTimestampShort, destroyChart, modelColor, escHtml } from '../helpers.js';
+import { shortModel, providerMeta, providerChip, fmtTimestamp, fmtTimestampShort, destroyChart, sortModelsByLiveScore, responseTimeDatasets, responseTimeTooltipLabel, EXPLORER_RESPONSE_COLORS } from '../helpers.js';
 import { openModal } from '../modal.js';
-
-const RESPONSE_AVG_WINDOW = 12;
-
-function rollingAverage(values, windowSize) {
-  let sum = 0;
-  let count = 0;
-  return values.map((v, i) => {
-    if (v != null) {
-      sum += v;
-      count++;
-    }
-    const expired = values[i - windowSize];
-    if (i >= windowSize && expired != null) {
-      sum -= expired;
-      count--;
-    }
-    return count ? sum / count : null;
-  });
-}
 
 export function populateExplorerSelect() {
   const sel = document.getElementById('explorer-select');
-  const sorted = [...state.modelNames].sort((a,b) => state.modelStats[b].score - state.modelStats[a].score);
+  const sorted = sortModelsByLiveScore(state.modelNames);
   sel.innerHTML = sorted.map(m =>
     `<option value="${m}"${m === state.explorerModel ? ' selected' : ''}>${shortModel(m)} (${providerMeta(m).name})</option>`
   ).join('');
@@ -61,41 +42,16 @@ export function renderExplorer() {
 
   // Response time chart
   const labels = state.runs.map(r => fmtTimestampShort(r.timestamp));
-  const timeData = s.responseTimes.map(v => v != null ? v / 1000 : null);
-  const avgTimeData = rollingAverage(timeData, RESPONSE_AVG_WINDOW);
-  const rawColor = modelColor(model);
+  const datasets = responseTimeDatasets([{
+    label: shortModel(model),
+    responseTimes: s.responseTimes,
+    fill: true,
+  }], EXPLORER_RESPONSE_COLORS);
 
   destroyChart('explorerTime');
   state.charts.explorerTime = new Chart(document.getElementById('chart-explorer-time'), {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: `${RESPONSE_AVG_WINDOW}-run average`,
-        data: avgTimeData,
-        borderColor: '#8bd11f',
-        backgroundColor: '#8bd11f1f',
-        fill: true,
-        tension: 0.45,
-        spanGaps: true,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        pointHitRadius: 8,
-        borderWidth: 3,
-      }, {
-        label: 'Raw runs',
-        data: timeData,
-        borderColor: rawColor + '66',
-        backgroundColor: rawColor + '14',
-        fill: false,
-        hidden: true,
-        tension: 0.18,
-        spanGaps: false,
-        pointRadius: timeData.map(v => v != null ? 2 : 0),
-        pointHoverRadius: 5,
-        borderWidth: 1.5,
-      }]
-    },
+    data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
@@ -110,10 +66,7 @@ export function renderExplorer() {
           pointStyle: 'line'
         }
       }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-        label: (item) => {
-          if (item.raw == null) return item.dataset.label === 'Raw runs' ? 'Raw runs: failed' : `${item.dataset.label}: no successes`;
-          return `${item.dataset.label}: ${item.raw.toFixed(2)}s`;
-        }
+        label: responseTimeTooltipLabel
       }}},
       scales: {
         x: { display: false },

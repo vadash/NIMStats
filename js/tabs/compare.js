@@ -1,9 +1,9 @@
 import { CHART_DEFAULTS } from '../constants.js';
 import { state } from '../state.js';
-import { shortModel, providerMeta, providerChip, fmtTimestampShort, destroyChart, modelColor } from '../helpers.js';
+import { shortModel, providerMeta, providerChip, fmtTimestampShort, destroyChart, modelColor, sortModelsByLiveScore, responseTimeDatasets, responseTimeTooltipLabel, COMPARE_RESPONSE_COLORS } from '../helpers.js';
 
 export function populateCompareSelects() {
-  const sorted = [...state.modelNames].sort((a,b) => state.modelStats[b].score - state.modelStats[a].score);
+  const sorted = sortModelsByLiveScore(state.modelNames);
   const opts = sorted.map(m => `<option value="${m}">${shortModel(m)} (${providerMeta(m).name})</option>`).join('');
 
   const selA = document.getElementById('compare-a');
@@ -82,44 +82,21 @@ export function renderCompare() {
 
   // Overlay chart
   const labels = state.runs.map(r => fmtTimestampShort(r.timestamp));
+  const datasets = responseTimeDatasets([
+    { label: shortModel(modelA), responseTimes: sA.responseTimes },
+    { label: shortModel(modelB), responseTimes: sB.responseTimes },
+  ], COMPARE_RESPONSE_COLORS);
+
   destroyChart('compareTime');
   state.charts.compareTime = new Chart(document.getElementById('chart-compare-time'), {
     type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: shortModel(modelA),
-          data: sA.responseTimes.map(v => v != null ? v/1000 : null),
-          borderColor: colorA,
-          backgroundColor: colorA + '14',
-          fill: false,
-          tension: 0.2,
-          spanGaps: false,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          borderWidth: 2,
-        },
-        {
-          label: shortModel(modelB),
-          data: sB.responseTimes.map(v => v != null ? v/1000 : null),
-          borderColor: colorB,
-          backgroundColor: colorB + '14',
-          fill: false,
-          tension: 0.2,
-          spanGaps: false,
-          pointRadius: 2,
-          pointHoverRadius: 5,
-          borderWidth: 2,
-        }
-      ]
-    },
+    data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { labels: { boxWidth: 12, font: { size: 11 } } },
         tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-          label: (item) => item.raw != null ? `${item.dataset.label}: ${item.raw.toFixed(2)}s` : `${item.dataset.label}: Failed`
+          label: responseTimeTooltipLabel
         }}
       },
       scales: {

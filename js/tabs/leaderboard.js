@@ -1,11 +1,10 @@
-import { CHART_DEFAULTS } from '../constants.js';
 import { state } from '../state.js';
-import { avg, shortModel, providerMeta, providerChip, sparklineSVG, modelColor } from '../helpers.js';
+import { shortModel, providerChip, sparklineSVG, modelColor, sortModelsByLiveScore, compareLiveStatus } from '../helpers.js';
 import { switchTab } from '../nav.js';
 
 export function renderLeaderboard() {
   const { modelNames, modelStats } = state;
-  const scores = [...modelNames].sort((a, b) => modelStats[b].score - modelStats[a].score);
+  const scores = sortModelsByLiveScore(modelNames, modelStats, state.runs);
   const ranks = {};
   scores.forEach((m, i) => { ranks[m] = i + 1; });
 
@@ -23,10 +22,13 @@ export function renderLbTable() {
   }
 
   rows.sort((a, b) => {
+    const liveSort = compareLiveStatus(a, b);
+    if (liveSort) return liveSort;
     let av = a[lbSort.col], bv = b[lbSort.col];
     if (av == null) av = lbSort.dir === 'asc' ? Infinity : -Infinity;
     if (bv == null) bv = lbSort.dir === 'asc' ? Infinity : -Infinity;
-    return lbSort.dir === 'asc' ? av - bv : bv - av;
+    const valueSort = lbSort.dir === 'asc' ? av - bv : bv - av;
+    return valueSort || a.model.localeCompare(b.model);
   });
 
   const tbody = document.getElementById('lb-body');
