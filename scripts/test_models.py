@@ -73,7 +73,6 @@ def failure_result(model: str, error: str) -> dict[str, Any]:
         "responseTime": None,
         "tokensGenerated": None,
         "totalTokens": None,
-        "response": None,
     }
 
 
@@ -152,7 +151,6 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
             "responseTime": response_time,
             "tokensGenerated": None,
             "totalTokens": None,
-            "response": raw_body,
         }
 
     error_obj = data.get("error")
@@ -197,7 +195,6 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
         "responseTime": response_time,
         "tokensGenerated": completion_tokens,
         "totalTokens": total_tokens,
-        "response": content,
         "error": None,
     }
 

@@ -30,8 +30,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             error            TEXT,
             response_time    INTEGER,
             tokens_generated INTEGER,
-            total_tokens     INTEGER,
-            response         TEXT
+            total_tokens     INTEGER
         );
         CREATE INDEX IF NOT EXISTS idx_mr_run   ON model_results(run_id);
         CREATE INDEX IF NOT EXISTS idx_mr_model ON model_results(model);
@@ -60,8 +59,8 @@ def write_run(run: dict[str, Any], db_path: Path = HISTORY_DB) -> None:
         run_id = cur.lastrowid
         conn.executemany(
             """INSERT INTO model_results
-               (run_id, model, success, error, response_time, tokens_generated, total_tokens, response)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (run_id, model, success, error, response_time, tokens_generated, total_tokens)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
             [
                 (
                     run_id,
@@ -71,7 +70,6 @@ def write_run(run: dict[str, Any], db_path: Path = HISTORY_DB) -> None:
                     m.get("responseTime"),
                     m.get("tokensGenerated"),
                     m.get("totalTokens"),
-                    m.get("response"),
                 )
                 for m in run.get("models", [])
             ],

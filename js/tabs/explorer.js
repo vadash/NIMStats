@@ -1,7 +1,6 @@
 import { CHART_DEFAULTS } from '../constants.js';
 import { state } from '../state.js';
 import { shortModel, providerMeta, providerChip, fmtTimestamp, fmtTimestampShort, destroyChart, sortModelsByLiveScore, responseTimeDatasets, responseTimeTooltipLabel, EXPLORER_RESPONSE_COLORS } from '../helpers.js';
-import { openModal } from '../modal.js';
 
 export function populateExplorerSelect() {
   const sel = document.getElementById('explorer-select');
@@ -126,30 +125,13 @@ export function renderExplorer() {
   const tbody = document.getElementById('explorer-run-table');
   const last20 = s.results.map((r, i) => ({ r, i })).slice(-20).reverse();
   tbody.innerHTML = last20.map(({ r, i }) => {
-    if (!r) return `<tr><td class="mono text-dim">${fmtTimestamp(state.runs[i]?.timestamp||'')}</td><td>--</td><td>--</td><td>--</td><td>--</td></tr>`;
+    if (!r) return `<tr><td class="mono text-dim">${fmtTimestamp(state.runs[i]?.timestamp||'')}</td><td>--</td><td>--</td><td>--</td></tr>`;
     const tps = (r.success && r.responseTime > 0) ? (r.tokensGenerated / (r.responseTime / 1000)).toFixed(1) : null;
-    const actionBtn = r.success
-      ? `<button class="btn-view" data-run="${i}">View</button>` : '--';
     return `<tr>
       <td class="mono" style="font-size:11px">${fmtTimestamp(state.runs[i]?.timestamp||'')}</td>
       <td><span class="status-badge ${r.success?'ok':'fail'}">${r.success?'OK':'Fail'}</span></td>
       <td class="mono">${r.success ? (r.responseTime/1000).toFixed(2)+'s' : '--'}</td>
       <td class="mono">${tps ? tps+' t/s' : '--'}</td>
-      <td>${actionBtn}</td>
     </tr>`;
   }).join('');
-
-  tbody.querySelectorAll('.btn-view[data-run]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const idx = parseInt(btn.dataset.run);
-      const run = state.runs[idx];
-      if (!run) return;
-      const q = state.db.exec(
-        'SELECT response FROM model_results WHERE run_id = ? AND model = ?',
-        [run._dbId, model]
-      );
-      const response = q[0]?.values[0]?.[0] || '';
-      openModal(model, response);
-    });
-  });
 }
