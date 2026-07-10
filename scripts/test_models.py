@@ -28,14 +28,12 @@ ALL_MODELS = [
     "z-ai/glm-5.2", # A bit quantized
     # good for text processing
     "nvidia/nemotron-3-super-120b-a12b",
-    "openai/gpt-oss-120b",    
+    "openai/gpt-oss-120b",
+    "mistralai/mistral-large-3-675b-instruct-2512", # fat and farious    
     # mid tier
-    "minimaxai/minimax-m3",
-    "mistralai/mistral-large-3-675b-instruct-2512",
     "mistralai/mistral-medium-3.5-128b",
     "stepfun-ai/step-3.7-flash",
     "qwen/qwen3.5-397b-a17b",
-    "qwen/qwen3.5-122b-a10b",
     # shit tier
     "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
 ]
@@ -47,6 +45,8 @@ ALL_MODELS = [
 # "minimaxai/minimax-m2.7", # 47s average
 # "deepseek-ai/deepseek-v4-pro", # 49s average
 # "deepseek-ai/deepseek-v4-flash", # 35s average, low uptime and sub 10 tps
+# "minimaxai/minimax-m3", # 30s average, 9 tps
+# "qwen/qwen3.5-122b-a10b", # 21s average, 20 tps, low uptime
 
 def selected_models() -> list[str]:
     if MODEL_INDEX is not None:
