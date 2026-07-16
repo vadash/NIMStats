@@ -36,6 +36,9 @@ ALL_MODELS = [
     "qwen/qwen3.5-397b-a17b",
     # shit tier
     "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
+    # new hot guy in the block
+    "poolside/laguna-xs-2.1",
+    "thinkingmachines/inkling", # US #1
 ]
 
 ## DEADGE
