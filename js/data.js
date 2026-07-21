@@ -115,87 +115,164 @@ export function processData(data) {
   return { runs, modelNames, modelStats };
 }
 
-export function computeHourlyStats(runs) {
-  const hourWeightedSum = Array(24).fill(0);
-  const hourWeightTotal = Array(24).fill(0);
-  const hourRealCount = Array(24).fill(0);
-  const hourFailCount = Array(24).fill(0);
-  const hourFailWeight = Array(24).fill(0);
+export function computeHourlyStats(runs, models) {
+  // Optional allowlist (top-5 filter). Normalize to a Set; omitted/empty = all models.
+  const allowSet = models && (Array.isArray(models) ? models.length : models.size) > 0
+    ? new Set(Array.isArray(models) ? models : [...models])
+    : null;
+
+  // --- 7x24 grid: dow (0=Sun..6=Sat) x localHour ---
+  const dowWeightedSum = Array.from({ length: 7 }, () => Array(24).fill(0));
+  const dowWeightTotal = Array.from({ length: 7 }, () => Array(24).fill(0));
+  const dowRealCount = Array.from({ length: 7 }, () => Array(24).fill(0));
+  const dowFailCount = Array.from({ length: 7 }, () => Array(24).fill(0));
+  const dowFailWeight = Array.from({ length: 7 }, () => Array(24).fill(0));
 
   let latestTs = 0;
   for (const run of runs) {
-    if (run.timestamp > latestTs) latestTs = run.timestamp;
+    const t = Date.parse(run.timestamp);
+    if (!Number.isNaN(t) && t > latestTs) latestTs = t;
   }
 
   const weightFor = (ts) => {
-    if (!latestTs) return 1.0;
-    const daysAgo = (latestTs - ts) / 86400000;
-    if (daysAgo <= 7) return 1.0;
-    if (daysAgo < 30) return 1.0 - 0.7 * (daysAgo - 7) / 23;
-    return 0.3;
+    if (!latestTs) return 1.0;                 // no parseable timestamps -> uniform weight
+    const t = Date.parse(ts);
+    if (Number.isNaN(t)) return 1.0;           // unparseable run -> full weight, skip decay
+    const daysAgo = (latestTs - t) / 86400000;
+    return Math.pow(0.5, daysAgo / 14);
   };
 
   for (const run of runs) {
-    const localHour = new Date(run.timestamp).getHours();
+    const d = new Date(run.timestamp);
+    const dow = d.getDay();        // 0=Sun..6=Sat
+    const localHour = d.getHours();
     const w = weightFor(run.timestamp);
     for (const m of run.models) {
+      if (allowSet && !allowSet.has(m.model)) continue;   // top-5 allowlist gate
       if (m.success && m.responseTime > 0) {
-        hourWeightedSum[localHour] += m.responseTime * w;
-        hourWeightTotal[localHour] += w;
-        hourRealCount[localHour]++;
+        dowWeightedSum[dow][localHour] += m.responseTime * w;
+        dowWeightTotal[dow][localHour] += w;
+        dowRealCount[dow][localHour]++;
       } else if (!m.success) {
-        hourFailCount[localHour]++;
-        hourFailWeight[localHour] += w;
+        dowFailCount[dow][localHour]++;
+        dowFailWeight[dow][localHour] += w;
       }
     }
   }
 
+  // --- Raw per-cell averages + failure penalty (same shape as today, per (dow,hour)) ---
+  const rawAvg = Array.from({ length: 7 }, () => Array(24).fill(0));
+  const nonEmptyCellValues = [];
+  for (let dow = 0; dow < 7; dow++) {
+    for (let h = 0; h < 24; h++) {
+      if (dowWeightTotal[dow][h] > 0) {
+        rawAvg[dow][h] = dowWeightedSum[dow][h] / dowWeightTotal[dow][h];
+        nonEmptyCellValues.push(rawAvg[dow][h]);
+      }
+    }
+  }
+  const globalMean = nonEmptyCellValues.length ? avg(nonEmptyCellValues) : 0;
+  const penalty = 2 * (globalMean || 1);
+
+  // dowRowMean(dow): mean of real-data cells in this dow row (using rawAvg, real cells only),
+  // or null if the whole row is empty. Computed from dowWeightTotal so it stays stable after
+  // empty-cell interpolation (interpolation never flips dowWeightTotal[dow][h] from 0 to >0).
+  const dowRowMean = (dow) => {
+    let s = 0, c = 0;
+    for (let h = 0; h < 24; h++) {
+      if (dowWeightTotal[dow][h] > 0) { s += rawAvg[dow][h]; c++; }
+    }
+    return c > 0 ? s / c : null;
+  };
+
+  for (let dow = 0; dow < 7; dow++) {
+    for (let h = 0; h < 24; h++) {
+      if (dowWeightTotal[dow][h] === 0 && dowFailCount[dow][h] === 0) {
+        // Interpolate empty cell: per-dow row mean for this hour's dow if available, else global mean.
+        rawAvg[dow][h] = dowRowMean(dow) ?? globalMean;
+      } else if (dowFailCount[dow][h] > 0) {
+        // Failure penalty: blend success+failure weighted totals within the cell.
+        const totalW = dowWeightTotal[dow][h] + dowFailWeight[dow][h];
+        const totalSum = dowWeightedSum[dow][h] + penalty * dowFailWeight[dow][h];
+        rawAvg[dow][h] = totalW > 0 ? totalSum / totalW : penalty;
+      }
+    }
+  }
+
+  // --- E2 shrinkage before spatial smoothing ---
+  // neighborhoodMean = circular mean of (dow, h±1) cells in the SAME dow row (2 neighbors);
+  // fall back to the dow-row mean if both neighbors are empty; fall back to global if the whole row is empty.
+  const regularized = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (let dow = 0; dow < 7; dow++) {
+    const rowMean = dowRowMean(dow);   // null iff the whole dow row has no real data
+    for (let h = 0; h < 24; h++) {
+      const leftIdx = (h - 1 + 24) % 24;
+      const rightIdx = (h + 1) % 24;
+      const leftReal = dowWeightTotal[dow][leftIdx] > 0;
+      const rightReal = dowWeightTotal[dow][rightIdx] > 0;
+      let neighborhoodMean;
+      if (leftReal || rightReal) {
+        // At least one neighbor has real data -> circular mean of the two neighbor cells.
+        neighborhoodMean = (rawAvg[dow][leftIdx] + rawAvg[dow][rightIdx]) / 2;
+      } else {
+        // Both neighbors empty -> dow-row hour mean, else global mean.
+        neighborhoodMean = rowMean ?? globalMean;
+      }
+      const n = dowRealCount[dow][h];
+      const effective_n = n > 0 ? n : 0.5;
+      const shrink = 1 / (1 + effective_n);
+      regularized[dow][h] = (1 - shrink) * rawAvg[dow][h] + shrink * neighborhoodMean;
+    }
+  }
+
+  // --- Spatial smoothing per dow row (circular over 24 hours) ---
+  // 5-tap [1,2,3,2,1]/9 uniformly; 7-tap [1,1,2,3,2,1,1]/11 only for pure-interpolation borders (realCount===0).
+  const smoothedDow = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (let dow = 0; dow < 7; dow++) {
+    for (let h = 0; h < 24; h++) {
+      const sparse = dowRealCount[dow][h] === 0;
+      const offsets = sparse ? [-3, -2, -1, 0, 1, 2, 3] : [-2, -1, 0, 1, 2];
+      const weights = sparse ? [1, 1, 2, 3, 2, 1, 1] : [1, 2, 3, 2, 1];
+      let sum = 0, wsum = 0;
+      for (let i = 0; i < offsets.length; i++) {
+        sum += regularized[dow][(h + offsets[i] + 24) % 24] * weights[i];
+        wsum += weights[i];
+      }
+      smoothedDow[dow][h] = sum / wsum;
+    }
+  }
+
+  // --- Fold to 24h with weekend down-weight ---
+  const WEEKEND_WEIGHT = 0.5; // Sat (6) / Sun (0)
+  const dowWeight = [WEEKEND_WEIGHT, 1, 1, 1, 1, 1, WEEKEND_WEIGHT];
   const hourAvg = Array(24).fill(0);
-  const hoursWithData = [];
-  for (let h = 0; h < 24; h++) {
-    if (hourWeightTotal[h] > 0) {
-      hourAvg[h] = hourWeightedSum[h] / hourWeightTotal[h];
-      hoursWithData.push(hourAvg[h]);
-    }
-  }
-  const globalMean = hoursWithData.length ? avg(hoursWithData) : 0;
-
-  for (let h = 0; h < 24; h++) {
-    if (hourWeightTotal[h] === 0 && hourFailCount[h] === 0) {
-      hourAvg[h] = globalMean;
-    }
-  }
-
-  for (let h = 0; h < 24; h++) {
-    if (hourFailCount[h] > 0) {
-      const penalty = 2 * (globalMean || 1);
-      const totalW = hourWeightTotal[h] + hourFailWeight[h];
-      const totalSum = hourWeightedSum[h] + penalty * hourFailWeight[h];
-      hourAvg[h] = totalW > 0 ? totalSum / totalW : penalty;
-    }
-  }
-
-  const isReal = Array(24).fill(true);
-  for (let h = 0; h < 24; h++) {
-    if (hourWeightTotal[h] === 0) {
-      isReal[h] = false;
-    }
-  }
-
   const smoothed = Array(24).fill(0);
+  const hourRealCount = Array(24).fill(0);
+  const weightedCounts = Array(24).fill(0);
+  const hourFailCount = Array(24).fill(0);
+  const isReal = Array(24).fill(false);
   for (let h = 0; h < 24; h++) {
-    const sparse = hourRealCount[h] < 3;
-    const offsets = sparse ? [-3, -2, -1, 0, 1, 2, 3] : [-2, -1, 0, 1, 2];
-    const weights = sparse ? [1, 1, 2, 3, 2, 1, 1] : [1, 2, 3, 2, 1];
-    let sum = 0, wsum = 0;
-    for (let i = 0; i < offsets.length; i++) {
-      sum += hourAvg[(h + offsets[i] + 24) % 24] * weights[i];
-      wsum += weights[i];
+    let foldSum = 0, foldW = 0;
+    for (let dow = 0; dow < 7; dow++) {
+      foldSum += dowWeight[dow] * smoothedDow[dow][h];
+      foldW += dowWeight[dow];
+      hourRealCount[h] += dowRealCount[dow][h];
+      weightedCounts[h] += dowWeightTotal[dow][h];
+      hourFailCount[h] += dowFailCount[dow][h];
+      if (dowWeightTotal[dow][h] > 0) isReal[h] = true;
     }
-    smoothed[h] = sum / wsum;
+    smoothed[h] = foldW > 0 ? foldSum / foldW : 0;
   }
-
-  const weightedCounts = hourWeightTotal.map(w => Math.round(w));
+  // Fold hourAvg (dow-weighted) from the regularized raw per-cell averages, mirroring smoothed's fold.
+  for (let h = 0; h < 24; h++) {
+    let foldSum = 0, foldW = 0;
+    for (let dow = 0; dow < 7; dow++) {
+      foldSum += dowWeight[dow] * regularized[dow][h];
+      foldW += dowWeight[dow];
+    }
+    hourAvg[h] = foldW > 0 ? foldSum / foldW : 0;
+  }
+  weightedCounts.forEach((v, i) => { weightedCounts[i] = Math.round(v); });
 
   return { hourAvg, smoothed, isReal, hourRealCount, weightedCounts, hourFailCount };
 }
@@ -217,27 +294,41 @@ export function computeBestTimeslots(hourlyStats) {
     zones.push({ start, hours, avgTime: zoneAvg, realCount, score: 0 });
   }
 
+  // Score all zones from their min/max so medals remain comparable across the full set.
   const minAvg = Math.min(...zones.map(z => z.avgTime));
   const maxAvg = Math.max(...zones.map(z => z.avgTime));
   for (const z of zones) {
     z.score = maxAvg > minAvg ? Math.round((minAvg / z.avgTime) * 100) : 100;
   }
 
-  let bestCombo = null;
-  let bestSum = -1;
-
-  for (let i = 0; i < zones.length; i++) {
-    for (let j = i + 1; j < zones.length; j++) {
-      if (zonesOverlap(zones[i], zones[j])) continue;
-      for (let k = j + 1; k < zones.length; k++) {
-        if (zonesOverlap(zones[i], zones[k]) || zonesOverlap(zones[j], zones[k])) continue;
-        const sum = zones[i].score + zones[j].score + zones[k].score;
-        if (sum > bestSum) {
-          bestSum = sum;
-          bestCombo = [zones[i], zones[j], zones[k]];
+  // E1 zone confidence gate: prefer zones with >= MIN_REAL_HOURS of real data.
+  // Relax the threshold when no valid 3-zone combo exists at the stricter tier,
+  // so ultra-sparse data (top-5 filter cuts sample counts ~5x) still shows
+  // something rather than a blank chart.
+  const pickBestCombo = (pool) => {
+    let best = null, bestSum = -1;
+    for (let i = 0; i < pool.length; i++) {
+      for (let j = i + 1; j < pool.length; j++) {
+        if (zonesOverlap(pool[i], pool[j])) continue;
+        for (let k = j + 1; k < pool.length; k++) {
+          if (zonesOverlap(pool[i], pool[k]) || zonesOverlap(pool[j], pool[k])) continue;
+          const sum = pool[i].score + pool[j].score + pool[k].score;
+          if (sum > bestSum) { bestSum = sum; best = [pool[i], pool[j], pool[k]]; }
         }
       }
     }
+    return best;
+  };
+
+  // Try stricter thresholds first; relax to 1 then 0 only when the current tier
+  // yields no valid non-overlapping triplet (pool size alone can't decide it —
+  // 4 contiguous zones have size >=3 but zero possible combos).
+  const tiers = [2, 1, 0];
+  let bestCombo = null;
+  for (const minReal of tiers) {
+    const pool = minReal > 0 ? zones.filter(z => z.realCount >= minReal) : zones;
+    bestCombo = pickBestCombo(pool);
+    if (bestCombo) break;
   }
 
   if (!bestCombo) return [];

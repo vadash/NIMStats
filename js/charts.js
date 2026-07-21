@@ -1,6 +1,6 @@
 import { CHART_DEFAULTS, cnPeakOverlayPlugin, euNaPeakOverlayPlugin, currentTimeLinePlugin, getCnPeakLocalWindows, cnPeakWindowsForHour, getEuNaPeakLocalWindows, euNaPeakWindowsForHour, splitHourWindow, wrapHour } from './constants.js';
 import { state } from './state.js';
-import { avg, modelColor, destroyChart } from './helpers.js';
+import { avg, modelColor, destroyChart, sortModelsByLiveScore } from './helpers.js';
 import { computeHourlyStats, computeBestTimeslots } from './data.js';
 
 Chart.defaults.color = '#aeb9a8';
@@ -8,9 +8,10 @@ Chart.defaults.borderColor = '#2b3627';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
 export function renderBestTimeslot() {
-  const hourlyStats = computeHourlyStats(state.runs);
+  const top5 = new Set(sortModelsByLiveScore(state.modelNames, state.modelStats, state.runs).slice(0, 5));
+  const hourlyStats = computeHourlyStats(state.runs, top5);
   const bestSlots = computeBestTimeslots(hourlyStats);
-  const { smoothed, weightedCounts, hourFailCount } = hourlyStats;
+  const { smoothed, weightedCounts, hourRealCount, hourFailCount } = hourlyStats;
 
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
   const dataSec = smoothed.map(v => v / 1000);
@@ -71,7 +72,7 @@ export function renderBestTimeslot() {
           const h = item.dataIndex;
           const fails = hourFailCount[h];
           const failStr = fails > 0 ? ` | ${fails} failed` : '';
-          const lines = [`Avg: ${item.raw.toFixed(2)}s (${weightedCounts[h]} recent samples${failStr})`];
+          const lines = [`Avg: ${item.raw.toFixed(2)}s · ${hourRealCount[h]} samples (${weightedCounts[h].toFixed(1)} weighted)${failStr}`];
           const peakHits = cnPeakWindowsForHour(h, cnPeakWindows);
           if (peakHits.length) {
             lines.push(`CN peak: ${peakHits.map(w => w.localLabel).join(', ')} local`);
