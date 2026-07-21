@@ -1,12 +1,13 @@
 """Shared SQLite utilities for reading/writing benchmark history."""
 
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HISTORY_DB = REPO_ROOT / "history.db"
-MAX_RUNS = 30 * 2 * 24
+RETENTION_DAYS = 14
 
 
 def init_schema(conn: sqlite3.Connection) -> None:
@@ -39,7 +40,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 
 def write_run(run: dict[str, Any], db_path: Path = HISTORY_DB) -> None:
-    """Insert a benchmark run into the database and prune runs beyond MAX_RUNS."""
+    """Insert a benchmark run and prune any runs older than RETENTION_DAYS."""
     summary = run.get("summary", {})
     conn = sqlite3.connect(str(db_path))
     try:
@@ -74,13 +75,20 @@ def write_run(run: dict[str, Any], db_path: Path = HISTORY_DB) -> None:
                 for m in run.get("models", [])
             ],
         )
+        # Age-based retention: drop runs whose timestamp predates the cutoff.
+        # `runs.timestamp` is ISO-8601 UTC ("YYYY-MM-DDTHH:MM:SSZ"); Lexicographic
+        # comparison against a cutoff of the same shape yields correct date math.
+        reference_ts = run.get("timestamp") or datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        try:
+            ref_dt = datetime.strptime(reference_ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        except ValueError:
+            ref_dt = datetime.now(timezone.utc)
+        cutoff = (ref_dt - timedelta(days=RETENTION_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        conn.execute("DELETE FROM runs WHERE timestamp < ?", (cutoff,))
+        # FK ON DELETE CASCADE already removes model_results; this orphan sweep
+        # is a backstop in case cascade wasn't applied (e.g. rows predating FK).
         conn.execute(
-            f"DELETE FROM runs WHERE id NOT IN "
-            f"(SELECT id FROM runs ORDER BY timestamp DESC LIMIT {MAX_RUNS})"
-        )
-        conn.execute(
-            "DELETE FROM model_results "
-            "WHERE run_id NOT IN (SELECT id FROM runs)"
+            "DELETE FROM model_results WHERE run_id NOT IN (SELECT id FROM runs)"
         )
         conn.commit()
         conn.execute("VACUUM")
