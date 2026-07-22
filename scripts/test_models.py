@@ -31,9 +31,7 @@ ALL_MODELS = [
     "openai/gpt-oss-120b",
     "mistralai/mistral-large-3-675b-instruct-2512", # fat and farious    
     # mid tier
-    "mistralai/mistral-medium-3.5-128b",
     "stepfun-ai/step-3.7-flash",
-    "qwen/qwen3.5-397b-a17b",
     "moonshotai/kimi-k2.6", # not deadge
     # shit tier
     "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
@@ -45,11 +43,13 @@ ALL_MODELS = [
 ## DEADGE
 # "z-ai/glm-5.1", # replaced by glm52, nice
 ## TOO SLOW
-# "minimaxai/minimax-m2.7", # 47s average
-# "deepseek-ai/deepseek-v4-pro", # 49s average
-# "deepseek-ai/deepseek-v4-flash", # 35s average, low uptime and sub 10 tps
-# "minimaxai/minimax-m3", # 30s average, 9 tps
-# "qwen/qwen3.5-122b-a10b", # 21s average, 20 tps, low uptime
+# "minimaxai/minimax-m2.7", # 49 / 0
+# "deepseek-ai/deepseek-v4-pro", # 49 / 0
+# "deepseek-ai/deepseek-v4-flash", # 35 / 10
+# "minimaxai/minimax-m3", # 30 / 9
+# "qwen/qwen3.5-122b-a10b", # 21 / 20
+# "qwen/qwen3.5-397b-a17b", 38 / 14
+# "mistralai/mistral-medium-3.5-128b", 28s/16tps
 
 def selected_models() -> list[str]:
     if MODEL_INDEX is not None:
