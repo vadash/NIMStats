@@ -1,6 +1,6 @@
-import { CHART_DEFAULTS, cnPeakOverlayPlugin, euNaPeakOverlayPlugin, currentTimeLinePlugin, getCnPeakLocalWindows, cnPeakWindowsForHour, getEuNaPeakLocalWindows, euNaPeakWindowsForHour, splitHourWindow, wrapHour } from './constants.js';
+import { CHART_DEFAULTS, cnPeakOverlayPlugin, euNaPeakOverlayPlugin, currentTimeLinePlugin, getCnPeakLocalWindows, cnPeakWindowsForHour, getEuNaPeakLocalWindows, euNaPeakWindowsForHour, splitHourWindow, wrapHour, TS_MODELS_KEY } from './constants.js';
 import { state } from './state.js';
-import { avg, modelColor, destroyChart, sortModelsByLiveScore } from './helpers.js';
+import { avg, modelColor, destroyChart, sortModelsByLiveScore, shortModel } from './helpers.js';
 import { computeHourlyStats, computeBestTimeslots } from './data.js';
 
 Chart.defaults.color = '#aeb9a8';
@@ -8,10 +8,20 @@ Chart.defaults.borderColor = '#2b3627';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
 export function renderBestTimeslot() {
-  const top5 = new Set(sortModelsByLiveScore(state.modelNames, state.modelStats, state.runs).slice(0, 5));
-  const hourlyStats = computeHourlyStats(state.runs, top5);
+  // Top-10 leaderboard models form the pickable pool; state.timeslotModels
+  // holds the active selection (persisted in localStorage by app.js).
+  const top10 = sortModelsByLiveScore(state.modelNames, state.modelStats, state.runs).slice(0, 10);
+  const selectSet = new Set(state.timeslotModels.length ? state.timeslotModels : top10);
+  const hourlyStats = computeHourlyStats(state.runs, selectSet);
   const bestSlots = computeBestTimeslots(hourlyStats);
   const { smoothed, weightedCounts, hourRealCount, hourFailCount } = hourlyStats;
+
+  renderTimeslotModelPicker(top10, selectSet);
+  const subEl = document.getElementById('timeslot-sub');
+  if (subEl) {
+    const count = selectSet.size;
+    subEl.textContent = `Based on ${count} of 10 models · last 30 days`;
+  }
 
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
   const dataSec = smoothed.map(v => v / 1000);
@@ -122,3 +132,33 @@ export function renderBestTimeslot() {
     </div>`;
   }).join('') + cnPeakPills + euNaPeakPills;
 }
+
+// Render the top-10 model picker above the chart. Toggle persists the
+// selection to localStorage and re-renders only the Best Timeslot chart.
+function renderTimeslotModelPicker(top10, selectSet) {
+  const pickerEl = document.getElementById('timeslot-model-picker');
+  if (!pickerEl) return;
+  pickerEl.innerHTML = top10.map((m, i) => {
+    const active = selectSet.has(m);
+    const color = modelColor(m);
+    const name = shortModel(m);
+    return `<button type="button" class="ts-model-pill${active ? ' active' : ''}" data-idx="${i}" title="${m}">
+      <span class="pv-dot" style="background:${active ? color : ''};"></span>
+      <span class="pv-name">${name}</span>
+    </button>`;
+  }).join('');
+  pickerEl.querySelectorAll('.ts-model-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = top10[+btn.dataset.idx];
+      if (!m) return;
+      const set = new Set(state.timeslotModels);
+      if (set.has(m)) set.delete(m); else set.add(m);
+      // Never allow empty — that would clear the chart.
+      if (set.size === 0) set.add(m);
+      state.timeslotModels = [...set];
+      try { localStorage.setItem(TS_MODELS_KEY, JSON.stringify(state.timeslotModels)); } catch {}
+      renderBestTimeslot();
+    });
+  });
+}
+

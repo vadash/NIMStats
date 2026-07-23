@@ -18,6 +18,10 @@ export const MODEL_PALETTE = [
   '#b99b2d','#b17ab0','#d07a3a','#d34a65','#8a9584'
 ];
 
+// Best Timeslot picker — shared localStorage key + default list length.
+export const TS_MODELS_KEY = 'nimstats:timeslot-models';
+export const TS_TOP = 10;
+
 export const CHART_DEFAULTS = {
   tooltip: {
     backgroundColor: '#151713',

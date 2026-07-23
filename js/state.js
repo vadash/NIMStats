@@ -10,5 +10,6 @@ export const state = {
   lbFilter: '',
   lbData: null,
   timelineFilter: 'all',
-  modalResponse: ''
+  modalResponse: '',
+  timeslotModels: []
 };
