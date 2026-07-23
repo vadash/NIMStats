@@ -32,7 +32,6 @@ ALL_MODELS = [
     "mistralai/mistral-large-3-675b-instruct-2512", # fat and farious    
     # mid tier
     "stepfun-ai/step-3.7-flash",
-    "moonshotai/kimi-k2.6", # not deadge
     # shit tier
     "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
     # new hot guy in the block
@@ -42,6 +41,7 @@ ALL_MODELS = [
 
 ## DEADGE
 # "z-ai/glm-5.1", # replaced by glm52, nice
+# "moonshotai/kimi-k2.6", # not not deadge
 ## TOO SLOW
 # "minimaxai/minimax-m2.7", # 49 / 0
 # "deepseek-ai/deepseek-v4-pro", # 49 / 0
