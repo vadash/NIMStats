@@ -28,10 +28,10 @@ ALL_MODELS = [
     "z-ai/glm-5.2", # A bit quantized
     # good for text processing
     "nvidia/nemotron-3-super-120b-a12b",
-    "openai/gpt-oss-120b",
-    "mistralai/mistral-large-3-675b-instruct-2512", # fat and farious    
+    "openai/gpt-oss-120b",   
     # mid tier
     "stepfun-ai/step-3.7-flash",
+    "deepseek-ai/deepseek-v4-flash", # new snap shot soon
     # shit tier
     "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
     # new hot guy in the block
@@ -42,10 +42,10 @@ ALL_MODELS = [
 ## DEADGE
 # "z-ai/glm-5.1", # replaced by glm52, nice
 # "moonshotai/kimi-k2.6", # not not deadge
+# "mistralai/mistral-large-3-675b-instruct-2512", # fat and furious
 ## TOO SLOW
 # "minimaxai/minimax-m2.7", # 49 / 0
 # "deepseek-ai/deepseek-v4-pro", # 49 / 0
-# "deepseek-ai/deepseek-v4-flash", # 35 / 10
 # "minimaxai/minimax-m3", # 30 / 9
 # "qwen/qwen3.5-122b-a10b", # 21 / 20
 # "qwen/qwen3.5-397b-a17b", 38 / 14
