@@ -115,8 +115,9 @@ export function processData(data) {
   return { runs, modelNames, modelStats };
 }
 
+// Aggregates token speed (tokens/sec) per local hour. Higher is better.
 export function computeHourlyStats(runs, models) {
-  // Optional allowlist (top-5 filter). Normalize to a Set; omitted/empty = all models.
+  // Optional allowlist (top-N filter). Normalize to a Set; omitted/empty = all models.
   const allowSet = models && (Array.isArray(models) ? models.length : models.size) > 0
     ? new Set(Array.isArray(models) ? models : [...models])
     : null;
@@ -149,8 +150,9 @@ export function computeHourlyStats(runs, models) {
     const w = weightFor(run.timestamp);
     for (const m of run.models) {
       if (allowSet && !allowSet.has(m.model)) continue;   // top-5 allowlist gate
-      if (m.success && m.responseTime > 0) {
-        dowWeightedSum[dow][localHour] += m.responseTime * w;
+      if (m.success && m.responseTime > 0 && m.tokensGenerated > 0) {
+        const tps = m.tokensGenerated / (m.responseTime / 1000);
+        dowWeightedSum[dow][localHour] += tps * w;
         dowWeightTotal[dow][localHour] += w;
         dowRealCount[dow][localHour]++;
       } else if (!m.success) {
@@ -172,7 +174,7 @@ export function computeHourlyStats(runs, models) {
     }
   }
   const globalMean = nonEmptyCellValues.length ? avg(nonEmptyCellValues) : 0;
-  const penalty = 2 * (globalMean || 1);
+  const penalty = 0;   // a failed call yields zero tokens/sec
 
   // dowRowMean(dow): mean of real-data cells in this dow row (using rawAvg, real cells only),
   // or null if the whole row is empty. Computed from dowWeightTotal so it stays stable after
@@ -291,14 +293,15 @@ export function computeBestTimeslots(hourlyStats) {
       if (isReal[h]) realCount++;
     }
     const zoneAvg = avg(hours.map(h => smoothed[h]));
-    zones.push({ start, hours, avgTime: zoneAvg, realCount, score: 0 });
+    zones.push({ start, hours, avgTps: zoneAvg, realCount, score: 0 });
   }
 
   // Score all zones from their min/max so medals remain comparable across the full set.
-  const minAvg = Math.min(...zones.map(z => z.avgTime));
-  const maxAvg = Math.max(...zones.map(z => z.avgTime));
+  // Token speed: higher is better, so the fastest zone anchors 100.
+  const minAvg = Math.min(...zones.map(z => z.avgTps));
+  const maxAvg = Math.max(...zones.map(z => z.avgTps));
   for (const z of zones) {
-    z.score = maxAvg > minAvg ? Math.round((minAvg / z.avgTime) * 100) : 100;
+    z.score = maxAvg > minAvg ? Math.round((z.avgTps / maxAvg) * 100) : 100;
   }
 
   // E1 zone confidence gate: prefer zones with >= MIN_REAL_HOURS of real data.

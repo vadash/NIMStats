@@ -75,9 +75,9 @@ export function destroyChart(key) {
   }
 }
 
-export const RESPONSE_AVG_WINDOW = 12;
-export const EXPLORER_RESPONSE_COLORS = ['#8bd11f', '#5ca7f2'];
-export const COMPARE_RESPONSE_COLORS = ['#8bd11f', '#5ca7f2', '#f2b84b', '#b98cff'];
+export const METRIC_AVG_WINDOW = 12;
+export const EXPLORER_METRIC_COLORS = ['#8bd11f', '#5ca7f2'];
+export const COMPARE_METRIC_COLORS = ['#8bd11f', '#5ca7f2', '#f2b84b', '#b98cff'];
 
 function latestRunTime(runs = state.runs) {
   return runs.reduce((latest, run) => {
@@ -116,7 +116,7 @@ export function sortModelsByLiveScore(models, modelStats = state.modelStats, run
   });
 }
 
-export function rollingAverage(values, windowSize = RESPONSE_AVG_WINDOW) {
+export function rollingAverage(values, windowSize = METRIC_AVG_WINDOW) {
   let sum = 0;
   let count = 0;
   return values.map((v, i) => {
@@ -133,13 +133,9 @@ export function rollingAverage(values, windowSize = RESPONSE_AVG_WINDOW) {
   });
 }
 
-export function responseTimeSeconds(responseTimes) {
-  return responseTimes.map(v => v != null ? v / 1000 : null);
-}
-
-export function responseTimeDatasets(series, colors) {
+export function metricDatasets(series, colors) {
   return series.flatMap((item, i) => {
-    const rawData = responseTimeSeconds(item.responseTimes);
+    const rawData = item.values;
     const smoothColor = colors[i];
     const rawColor = colors[i + series.length];
     return [{
@@ -170,13 +166,15 @@ export function responseTimeDatasets(series, colors) {
   });
 }
 
-export function responseTimeTooltipLabel(item) {
-  if (item.raw == null) {
-    return item.dataset.label.endsWith(' raw')
-      ? `${item.dataset.label}: failed`
-      : `${item.dataset.label}: no successes`;
-  }
-  return `${item.dataset.label}: ${item.raw.toFixed(2)}s`;
+export function metricTooltipLabel(unit, decimals = 2) {
+  return (item) => {
+    if (item.raw == null) {
+      return item.dataset.label.endsWith(' raw')
+        ? `${item.dataset.label}: failed`
+        : `${item.dataset.label}: no successes`;
+    }
+    return `${item.dataset.label}: ${item.raw.toFixed(decimals)}${unit}`;
+  };
 }
 
 export function animateCounter(el, target, duration = 1200, decimals = 0, suffix = '') {

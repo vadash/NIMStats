@@ -24,7 +24,7 @@ export function renderBestTimeslot() {
   }
 
   const labels = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, '0'));
-  const dataSec = smoothed.map(v => v / 1000);
+  const dataTps = smoothed;
   const cnPeakWindows = getCnPeakLocalWindows(state.runs);
   const euNaPeakWindows = getEuNaPeakLocalWindows(state.runs);
 
@@ -33,7 +33,8 @@ export function renderBestTimeslot() {
   const range = maxVal - minVal || 1;
 
   const barColorsFills = smoothed.map(v => {
-    const t = (v - minVal) / range;
+    // t = 0 at the slowest hour, 1 at the fastest -> green means high token speed.
+    const t = 1 - (v - minVal) / range;
     const r = Math.round(118 + t * (239 - 118));
     const g = Math.round(185 - t * (185 - 68));
     const b = Math.round(0 + t * (68 - 0));
@@ -64,8 +65,8 @@ export function renderBestTimeslot() {
     data: {
       labels,
       datasets: [{
-        label: 'Avg Response Time',
-        data: dataSec,
+        label: 'Avg Token Speed',
+        data: dataTps,
         backgroundColor: finalBgColors,
         borderColor: finalBorderColors,
         borderWidth: 2,
@@ -82,7 +83,7 @@ export function renderBestTimeslot() {
           const h = item.dataIndex;
           const fails = hourFailCount[h];
           const failStr = fails > 0 ? ` | ${fails} failed` : '';
-          const lines = [`Avg: ${item.raw.toFixed(2)}s · ${hourRealCount[h]} samples (${weightedCounts[h].toFixed(1)} weighted)${failStr}`];
+          const lines = [`Avg: ${item.raw.toFixed(1)} t/s · ${hourRealCount[h]} samples (${weightedCounts[h].toFixed(1)} weighted)${failStr}`];
           const peakHits = cnPeakWindowsForHour(h, cnPeakWindows);
           if (peakHits.length) {
             lines.push(`CN peak: ${peakHits.map(w => w.localLabel).join(', ')} local`);
@@ -96,7 +97,7 @@ export function renderBestTimeslot() {
       }}},
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { grid: { color: '#2b3627' }, ticks: { callback: v => v + 's' }, beginAtZero: true }
+        y: { grid: { color: '#2b3627' }, ticks: { callback: v => v + ' t/s' }, beginAtZero: true }
       }
     }
   });

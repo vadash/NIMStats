@@ -1,6 +1,6 @@
 import { CHART_DEFAULTS } from '../constants.js';
 import { state } from '../state.js';
-import { shortModel, providerMeta, providerChip, fmtTimestamp, fmtTimestampShort, destroyChart, sortModelsByLiveScore, responseTimeDatasets, responseTimeTooltipLabel, EXPLORER_RESPONSE_COLORS } from '../helpers.js';
+import { shortModel, providerMeta, providerChip, fmtTimestamp, fmtTimestampShort, destroyChart, sortModelsByLiveScore, metricDatasets, metricTooltipLabel, EXPLORER_METRIC_COLORS } from '../helpers.js';
 
 export function populateExplorerSelect() {
   const sel = document.getElementById('explorer-select');
@@ -39,13 +39,13 @@ export function renderExplorer() {
     <div class="stat-card"><div class="stat-val" style="color:var(--blue)">${s.avgTps ? s.avgTps.toFixed(1)+' t/s' : '--'}</div><div class="stat-label">Avg Throughput</div></div>
   `;
 
-  // Response time chart
+  // Token speed chart
   const labels = state.runs.map(r => fmtTimestampShort(r.timestamp));
-  const datasets = responseTimeDatasets([{
+  const datasets = metricDatasets([{
     label: shortModel(model),
-    responseTimes: s.responseTimes,
+    values: s.throughputs,
     fill: true,
-  }], EXPLORER_RESPONSE_COLORS);
+  }], EXPLORER_METRIC_COLORS);
 
   destroyChart('explorerTime');
   state.charts.explorerTime = new Chart(document.getElementById('chart-explorer-time'), {
@@ -65,11 +65,11 @@ export function renderExplorer() {
           pointStyle: 'line'
         }
       }, tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-        label: responseTimeTooltipLabel
+        label: metricTooltipLabel(' t/s', 1)
       }}},
       scales: {
         x: { display: false },
-        y: { grid: { color: '#2b3627' }, ticks: { callback: v => v + 's' } }
+        y: { grid: { color: '#2b3627' }, ticks: { callback: v => v + ' t/s' } }
       }
     }
   });

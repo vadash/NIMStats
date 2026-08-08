@@ -1,6 +1,6 @@
 import { CHART_DEFAULTS } from '../constants.js';
 import { state } from '../state.js';
-import { shortModel, providerMeta, providerChip, fmtTimestampShort, destroyChart, modelColor, sortModelsByLiveScore, responseTimeDatasets, responseTimeTooltipLabel, COMPARE_RESPONSE_COLORS } from '../helpers.js';
+import { shortModel, providerMeta, providerChip, fmtTimestampShort, destroyChart, modelColor, sortModelsByLiveScore, metricDatasets, metricTooltipLabel, COMPARE_METRIC_COLORS } from '../helpers.js';
 
 export function populateCompareSelects() {
   const sorted = sortModelsByLiveScore(state.modelNames);
@@ -82,10 +82,10 @@ export function renderCompare() {
 
   // Overlay chart
   const labels = state.runs.map(r => fmtTimestampShort(r.timestamp));
-  const datasets = responseTimeDatasets([
-    { label: shortModel(modelA), responseTimes: sA.responseTimes },
-    { label: shortModel(modelB), responseTimes: sB.responseTimes },
-  ], COMPARE_RESPONSE_COLORS);
+  const datasets = metricDatasets([
+    { label: shortModel(modelA), values: sA.responseTimes.map(v => v != null ? v / 1000 : null) },
+    { label: shortModel(modelB), values: sB.responseTimes.map(v => v != null ? v / 1000 : null) },
+  ], COMPARE_METRIC_COLORS);
 
   destroyChart('compareTime');
   state.charts.compareTime = new Chart(document.getElementById('chart-compare-time'), {
@@ -96,7 +96,7 @@ export function renderCompare() {
       plugins: {
         legend: { labels: { boxWidth: 12, font: { size: 11 } } },
         tooltip: { ...CHART_DEFAULTS.tooltip, callbacks: {
-          label: responseTimeTooltipLabel
+          label: metricTooltipLabel('s')
         }}
       },
       scales: {
