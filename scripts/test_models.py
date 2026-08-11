@@ -31,11 +31,11 @@ ALL_MODELS = [
     "openai/gpt-oss-120b",   
     # mid tier
     "stepfun-ai/step-3.7-flash",
-    "deepseek-ai/deepseek-v4-flash", # new snap shot soon
     # shit tier
     "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
     # new hot guy in the block
     "poolside/laguna-xs-2.1",
+    "meta/muse-glimmer-30b",
     "thinkingmachines/inkling", # US #1
 ]
 
@@ -43,6 +43,7 @@ ALL_MODELS = [
 # "z-ai/glm-5.1", # replaced by glm52, nice
 # "moonshotai/kimi-k2.6", # not not deadge
 # "mistralai/mistral-large-3-675b-instruct-2512", # fat and furious
+# "deepseek-ai/deepseek-v4-flash",
 ## TOO SLOW
 # "minimaxai/minimax-m2.7", # 49 / 0
 # "deepseek-ai/deepseek-v4-pro", # 49 / 0
