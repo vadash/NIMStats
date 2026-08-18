@@ -26,6 +26,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 ALL_MODELS = [
     # SOTA
     "z-ai/glm-5.2", # A bit quantized
+    "z-ai/glm-5.3", # A bit quantized
     # good for text processing
     "nvidia/nemotron-3-super-120b-a12b",
     "openai/gpt-oss-120b",   
