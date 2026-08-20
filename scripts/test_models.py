@@ -38,6 +38,7 @@ ALL_MODELS = [
     "poolside/laguna-xs-2.1",
     "meta/muse-glimmer-30b",
     "thinkingmachines/inkling", # US #1
+    "google/diffusiongemma-26b-a4b-it",
 ]
 
 ## DEADGE
