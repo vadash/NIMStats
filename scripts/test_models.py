@@ -25,6 +25,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 ALL_MODELS = [
     # SOTA
+    "moonshotai/kimi-k3", #EA
+    "moonshotai/kimi-k2.6", #EA
     "z-ai/glm-5.2", # A bit quantized
     "z-ai/glm-5.3", # A bit quantized
     # good for text processing
