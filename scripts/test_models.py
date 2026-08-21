@@ -113,7 +113,7 @@ def call_model(model: str, prompt: str) -> dict[str, Any]:
         "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 1.0,
-        "top_p": 1.0,
+        "top_p": 0.95,
         "max_tokens": 1000,
         "stream": False,
     }
