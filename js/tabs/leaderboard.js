@@ -47,7 +47,7 @@ export function renderLbTable() {
 
     return `<tr data-model="${r.model}">
       <td><span class="rank-num${isTop3?' top3':''}">${r.rank}</span></td>
-      <td><div class="model-name-cell">${providerChip(r.model, true)}<span class="model-name-text" title="${r.model}">${shortModel(r.model)}</span>${trendHtml}</div></td>
+      <td><div class="model-name-cell">${providerChip(r.model, true)}<span class="model-name-text" title="${r.model}">${shortModel(r.model)}</span>${trendHtml}<button class="copy-name" title="Copy ${r.model}">copy</button></div></td>
       <td><div class="score-cell"><span class="score-num" style="color:${scoreColor}">${r.score}</span></div></td>
       <td><div class="uptime-cell"><span class="uptime-val" style="color:${uptimeColor}">${uptimePct}%</span><div class="uptime-bar"><div class="uptime-fill" style="width:${uptimePct}%;background:${uptimeColor}"></div></div></div></td>
       <td class="mono">${r.avgTime ? (r.avgTime/1000).toFixed(2)+'s' : '--'}</td>
@@ -59,7 +59,16 @@ export function renderLbTable() {
   }).join('');
 
   tbody.querySelectorAll('tr[data-model]').forEach(row => {
-    row.addEventListener('click', () => {
+    row.addEventListener('click', e => {
+      const btn = e.target.closest('.copy-name');
+      if (btn) {
+        e.stopPropagation();
+        navigator.clipboard?.writeText(row.dataset.model);
+        btn.textContent = 'ok';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1200);
+        return;
+      }
       state.explorerModel = row.dataset.model;
       switchTab('explorer');
     });

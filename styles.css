@@ -120,6 +120,10 @@ td{padding:10px 14px;color:var(--text);vertical-align:middle}
 .provider-chip{display:inline-flex;align-items:center;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;margin-right:7px;flex-shrink:0}
 .model-name-cell{display:flex;align-items:center;gap:4px;max-width:300px}
 .model-name-text{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.copy-name{flex-shrink:0;margin-left:2px;padding:1px 6px;border:1px solid var(--border-strong);border-radius:3px;background:var(--surface-alt);color:var(--text-muted);font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;opacity:0;transition:opacity 0.12s,color 0.12s,border-color 0.12s}
+tbody tr:hover .copy-name,.copy-name:focus-visible,.copy-name.copied{opacity:1}
+.copy-name:hover{color:var(--accent-dark);border-color:var(--accent-dark)}
+.copy-name.copied{color:var(--success);border-color:var(--success)}
 .score-cell{display:flex;align-items:center;gap:8px}
 .score-num{font-family:'JetBrains Mono',monospace;font-weight:800;font-size:15px}
 .uptime-cell{display:flex;flex-direction:column;gap:4px;min-width:90px}
