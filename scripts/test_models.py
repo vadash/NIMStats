@@ -29,6 +29,7 @@ ALL_MODELS = [
     "moonshotai/kimi-k2.6", #EA
     "z-ai/glm-5.2", # A bit quantized
     "z-ai/glm-5.3", # A bit quantized
+    "deepseek-ai/deepseek-v4-flash-0731", # its back
     # good for text processing
     "nvidia/nemotron-3-super-120b-a12b",
     "openai/gpt-oss-120b",   
