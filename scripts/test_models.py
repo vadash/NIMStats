@@ -24,24 +24,21 @@ PROMPT = "Write a C# 10 function named IsPrime that takes an int parameter and r
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 ALL_MODELS = [
-    # SOTA
-    "moonshotai/kimi-k3", #EA
-    "moonshotai/kimi-k2.6", #EA
-    "z-ai/glm-5.2", # A bit quantized
-    "z-ai/glm-5.3", # A bit quantized
-    "deepseek-ai/deepseek-v4-flash-0731", # its back
-    # good for text processing
-    "nvidia/nemotron-3-super-120b-a12b",
-    "openai/gpt-oss-120b",   
-    # mid tier
-    "stepfun-ai/step-3.7-flash",
-    # shit tier
-    "nvidia/nemotron-3-ultra-550b-a55b", # Def open clown model @ nvidia provider, avoid
-    # new hot guy in the block
-    "poolside/laguna-xs-2.1",
+    ###
+    "moonshotai/kimi-k3", # hidden
+    ###
+    "deepseek-ai/deepseek-v4-pro-0813",
+    "deepseek-ai/deepseek-v4-flash-0731",
+    ###
+    "z-ai/glm-5.3", # soon
+    "z-ai/glm-5.3-flash", # soon
+    ###
+    "google/diffusiongemma-26b-a4b-it", # good for some text work
+    ###
+    "stepfun-ai/step-3.7-flash", # oldge
     "meta/muse-glimmer-30b",
-    "thinkingmachines/inkling", # US #1
-    "google/diffusiongemma-26b-a4b-it",
+    "nvidia/nemotron-3-super-120b-a12b",  # pretty reliable
+    "nvidia/nemotron-3-ultra-550b-a55b", # def open clown model
 ]
 
 ## DEADGE
