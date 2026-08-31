@@ -34,9 +34,7 @@ ALL_MODELS = [
     "z-ai/glm-5.3-flash", # soon
     ###
     "google/diffusiongemma-26b-a4b-it", # good for some text work
-    "google/gemma-4-31b-it", # same
     ###
-    "stepfun-ai/step-3.7-flash", # oldge
     "meta/muse-glimmer-30b",
     "nvidia/nemotron-3-super-120b-a12b",  # pretty reliable
     "nvidia/nemotron-3-ultra-550b-a55b", # def open clown model
