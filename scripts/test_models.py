@@ -25,13 +25,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 ALL_MODELS = [
     ###
-    "moonshotai/kimi-k3", # hidden
+    "moonshotai/kimi-k3", # too fat to run
     ###
-    "deepseek-ai/deepseek-v4-pro-0813",
-    "deepseek-ai/deepseek-v4-flash-0731",
+    "deepseek-ai/deepseek-v4.1-flash", # new deep shit
     ###
-    "z-ai/glm-5.3", # soon
-    "z-ai/glm-5.3-flash", # soon
+    "z-ai/glm-5.3", # here
+    "z-ai/glm-5.3-flash", # here
     ###
     "google/diffusiongemma-26b-a4b-it", # good for some text work
     ###
