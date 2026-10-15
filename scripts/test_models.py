@@ -37,6 +37,10 @@ ALL_MODELS = [
     "meta/muse-glimmer-30b",
     "nvidia/nemotron-3-super-120b-a12b",  # pretty reliable
     "nvidia/nemotron-3-ultra-550b-a55b", # def open clown model
+    ### new shit
+    "stepfun-ai/step-5-preview",
+    "stepfun-ai/step-5",
+    "nvidia/nemotron-3.5-super-vl-120b-a12b"
 ]
 
 ## DEADGE
